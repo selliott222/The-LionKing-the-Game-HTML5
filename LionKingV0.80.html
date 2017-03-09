@@ -1,0 +1,2397 @@
+<!DOCTYPE html>
+<html>
+<body>
+<canvas id="canvas" width="1020" height="680" style="border:4px solid #000000;"></canvas>
+
+
+<style>
+body {
+	background: #000000;
+}
+
+#canvas {
+	padding-left: 0;
+    padding-right: 0;
+    margin-left: auto;
+    margin-right: auto;
+    display: block;
+}
+
+@font-face {
+    font-family: 'pixelFJ8pt1__';
+    src: url('font/pixelFJ8pt1__.ttf');
+}
+
+</style>
+</body>
+
+<script>
+		//Start Canvas
+		var ctx = document.getElementById("canvas").getContext("2d");
+		var canvas = document.getElementById("canvas");
+		
+		
+		///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+		//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+		//
+		// :OBJECTS:
+		// Every object requires varibles: id, x, y, depth, debug_id, array_pos  
+		// Every object requires functions: step()
+		// When creating a new object add it to objarray[] ---> objarray[objarray.length] = new Object();
+		///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+		var Object = function(){
+			this.id = "object";
+			this.x = 0;
+			this.y = 0;
+			this.depth = 0;
+			this.debug_id = objarray.length;
+			this.array_pos = objarray.length - 1;
+			
+			this.step = function(){
+				return;
+			}
+			
+			this.draw = function(){
+				return;
+			}
+			
+			return this;
+		}
+		
+		var Hud = function(){
+			this.id = "hud";
+			this.x = 0;
+			this.y = 0;
+			this.depth = 4000;
+			this.debug_id = objarray.length;
+			this.array_pos = 0;
+			this.hp_img = new Image();
+			this.hp_img.src = "img/life_meter.png";
+			this.rbar = new Image();
+			this.rbar.src = "img/roar_meter.png";
+			this.hud_head = new Image();
+			this.hud_head.src = "img/simba_head.png";
+			
+			this.step = function(){
+				this.draw();
+			}
+			
+			this.draw = function(){
+				ctx.globalAlpha = 1;
+				ctx.strokeStyle = 'black';
+				ctx.strokeRect((canvas.width/scale - 50) - 3, 7,  (4 * player.maxhp) + 6, 14);
+				ctx.fillRect((canvas.width/scale - 50) - 1, 9,  (4 * player.hp) + 2, 10);
+				ctx.drawImage(this.hp_img, 0, 0, 4 * player.hp, 8, canvas.width/scale - 50, 10, 4 * player.hp, 8);
+				
+				ctx.strokeRect(30 - 3, 7,  (4 * player.maxroar) + 6, 14);
+				ctx.fillRect(30 - 1, 9,  (4 * player.r) + 2, 10);
+				ctx.drawImage(this.rbar, 0, 0, 4 * player.r, 8, 30, 10, 4 * player.r, 8);
+				
+				ctx.drawImage(this.hud_head, 20, canvas.height/scale - 36);
+			}
+			
+			return this;
+		}	
+		
+		var Box = function(x,y,w,h){ 
+				var self = {x:x, y:y, width:w, height:h}
+				return self;
+		}
+		
+		var HitBox = function(id,x,y,w,h,vspeed, hspeed, time){ 
+				this.id = id;
+				this.depth = 700;
+				this.x = x;
+				this.y = y;
+				this.hspeed = hspeed;
+				this.vspeed = vspeed;
+				this.height = h;
+				this.width = w;
+				this.timer = time;
+				this.array_pos = objarray.length - 1;
+				
+				this.max_distance = Math.sqrt((w * w) + (h * h)) + 5;
+				
+				this.step = function(){
+					this.timer -= 1;
+					if (this.timer <= 0){objarray.splice(this.array_pos,1);}
+					
+					this.x += this.hspeed;
+					this.y += this.vspeed;
+					
+					this.draw();
+				}
+				
+				this.draw = function(){
+					if (debug){
+						ctx.fillRect(this.x, this.y, this.width, this.height);
+					}
+				}
+				
+				return this;
+		}
+		
+		var RectBlock = function(type ,x, y, w, h, d_id){
+			this.id = "block";
+			this.type = type;
+			this.x = x;
+			this.y = y;
+			this.width = w;
+			this.height = h;
+			this.depth = 700;
+			this.debug_id = d_id;
+			this.array_pos = objarray.length - 1;
+			
+			this.max_distance = Math.sqrt((w * w) + (h * h)) + 5;
+			
+			this.step = function(){
+				this.draw();
+				return;
+			}
+			
+			this.draw = function(){
+				if (debug){
+					if (this.type == 'block'){ctx.fillStyle = 'blue';}
+					if (this.type == 'tblock'){ctx.fillStyle = 'red';}
+					if (this.type == 'eblock'){ctx.fillStyle = 'green';}
+					if (this.type == 'rblock'){ctx.fillStyle = 'purple';}
+					if (this.type == 'bossblock'){ctx.fillStyle = 'yellow';}
+					ctx.globalAlpha = 0.5;
+					ctx.fillRect(this.x, this.y, this.width, this.height);
+					ctx.globalAlpha = 1;
+					ctx.fillStyle = 'white';
+					ctx.fillText(this.debug_id, this.x, this.y + 14);
+				}
+			}
+			
+			return this;
+		}
+		
+		var Player = function(x, y){
+			this.id = "player";
+			this.x = x;
+			this.y = y;
+			this.depth = 10;
+			this.debug_id = -1;
+			this.array_pos = objarray.length - 1;
+			
+			this.maxhp = 4;
+			this.hp = 4;
+			
+			this.maxroar = 4;
+			this.r = 0;
+			
+			this.vspeed = 0;
+			this.hspeed = 0;
+			this.gravity = 0.3;
+			
+			this.hurt = false;
+			this.blink = true;
+			
+			this.roar = false;
+			
+			this.dir = 1;
+			this.speed = 4;
+			this.goleft = false;
+			this.goright = false;
+			this.goup = false;
+			this.godown = false;
+			
+			this.sprite = sprite_simba_stand;
+			this.image_index = 0;
+			this.sprite_speed = 3;
+			this.counter = 0;
+			
+			this.dead = false;
+			this.deadtimer = 340;
+			this.xoff = 0;
+			this.yoff = 0;
+			
+			this.hang = false;
+			this.hangx = 0;
+			this.hangy = 0;
+			this.jumping = false;
+			this.falling = true;
+			
+			this.step = function(){
+		
+				if (this.hurt){this.r = 0;}
+				if (this.r < this.maxroar && this.counter % 60 == 0){this.r += 1;}
+		
+				if (this.hurt == true && this.counter > 140){this.hurt = false; this.blink = false;}
+				else {this.blink = !this.blink;}
+				
+				if (this.hp <= 0 && !this.dead){snd_death.play(); snd_pridelands.pause(); deleteobjects = true; this.hurt = false; this.blink = false; this.dead = true; image_index=0;}
+				
+				if (this.hang == true){
+						if (this.sprite.index != 'simba_ledgegrab' && this.sprite.index != 'simba_ledgepull'){this.sprite = sprite_simba_ledgegrab; this.image_index = 0;}
+						if (this.image_index > 17 && this.sprite.index != 'simba_ledgepull'){this.image_index = 12;}
+						if (this.sprite.index == 'simba_ledgepull' && this.counter % 2 == 0){
+								this.hangy += -2;
+								this.hangx += (this.dir * 2);
+								this.yoff += 2;
+								this.xoff += -(this.dir * 2);
+							}
+						this.vspeed=0;
+						this.hspeed=0;
+						this.x = this.hangx - 8;
+						this.y = this.hangy + 5;
+						if (this.goright == true && this.dir == 1 && this.image_index > 9){this.sprite = sprite_simba_ledgepull; this.image_index = 0;}
+						if (this.goleft == true && this.dir == -1 && this.image_index > 9){this.sprite = sprite_simba_ledgepull; this.image_index = 0;}
+						this.goleft = false;
+						this.goright = false;
+						
+					}
+					
+				this.vspeed += this.gravity;
+				
+				if (this.sprite.index == 'simba_pounce'){this.jumping == true;}
+				if (this.sprite.index == 'simba_hurt'){this.jumping == true; this.sprite_speed = 4; this.roar = false;}
+				
+				if (this.sprite.index == 'simba_hurt'){this.hspeed = -this.dir * 1;}
+				else if (this.goright == true && this.sprite.index != 'simba_turn'){this.hspeed = this.speed; this.dir=1;}
+				else if (this.goleft == true && this.sprite.index != 'simba_turn'){this.hspeed = -this.speed; this.dir=-1;}
+				else if (this.goright == false && this.goleft == false){this.hspeed = 0;}
+		
+				if (this.sprite.index == 'simba_roll'){this.hspeed = 4 * this.dir;}
+				if (this.sprite.index == 'simba_roar'){this.hspeed = 0; this.sprite_speed = 4;}
+				this.checkcollision();
+				
+				if (this.counter % this.sprite_speed == 0){
+						if (this.dead && this.image_index == 22){}
+						else {this.image_index += 1;}
+						}
+				if (this.image_index > this.sprite.sprite_length){this.animationend(); this.image_index=0;}
+				this.counter += 1;
+				if (this.counter > 5000){this.counter=0;}
+				
+				if (this.goleft == true){if (this.jumping == false && this.sprite.index != 'simba_turn' && this.sprite.index != 'simba_roar' && this.sprite.index != 'simba_hurt' && this.sprite.index != 'simba_roll'){this.sprite = sprite_simba_run;}}
+				if (this.goright == true){if (this.jumping == false && this.sprite.index != 'simba_turn' && this.sprite.index != 'simba_roar' && this.sprite.index != 'simba_hurt' && this.sprite.index != 'simba_roll'){this.sprite = sprite_simba_run;}}
+				if (this.jumping == true){
+					if (this.sprite.index == 'simba_highjump'){
+						if (this.vspeed < 0 && this.image_index >= 2){this.image_index = 2; this.speed = 2;}
+						if (this.vspeed > 0 && this.image_index >= 5){this.image_index = 5; this.speed = 2;}
+						}
+					if (this.sprite.index == 'simba_jump'){
+						if (this.vspeed < 0 && this.image_index >= 3){this.image_index = 3}
+						if (this.vspeed > 0 && this.image_index >= 12){this.image_index = 12}
+						}
+					}
+					
+				if ((this.sprite.index == 'simba_run' || this.sprite.index == 'simba_stand') && this.vspeed > 3){this.jumping = true; this.falling = true; this.sprite = sprite_simba_jump; this.image_index = 6;}	
+					
+				if (this.sprite.index == 'simba_crouch'){
+						if (this.image_index >= 3){this.image_index = 3;}
+					}
+				
+				if (this.sprite.index == 'simba_stand'){this.sprite_speed = 6;}
+				else  if (this.sprite.index != 'simba_turn'){this.sprite_speed = 3;}
+				if (this.hp <= 0){
+					if (this.deadtimer <= 0){window.location.reload();}
+					this.deadtimer -= 1;
+					this.vspeed = -1; 
+					this.hspeed = 0;
+					this.sprite = sprite_simba_die;
+					this.sprite_speed = 6;
+					}
+				
+				this.x += this.hspeed;
+				this.y += this.vspeed;
+				
+				if (this.x < 70){this.x = 70;}
+				
+				this.draw();
+			}
+			
+			this.draw = function(){
+			
+				if (!this.hurt || !this.blink){
+					ctx.scale(this.dir,1);
+					ctx.drawImage(this.sprite.image, this.sprite.sprite_width * this.image_index, 0, this.sprite.sprite_width, 
+									this.sprite.sprite_height, (this.x * this.dir) + this.sprite.xoffset + (this.xoff * this.dir), this.y + this.sprite.yoffset + this.yoff, this.sprite.sprite_width, this.sprite.sprite_height);
+					ctx.scale(this.dir,1);
+				}
+				
+				if (debug){
+				ctx.globalAlpha = 0.5;
+				ctx.fillStyle = 'blue';
+				ctx.fillRect(this.x-5, this.y-14, 10, 28);
+				ctx.style = 'black';
+				ctx.globalAlpha = 1;
+				}
+
+				
+				//ctx.globalAlpha = 0.3;
+				//ctx.beginPath();
+				//ctx.arc(this.x,this.y,300,0,2*Math.PI);
+				//ctx.fill();
+				//ctx.globalAlpha = 1;
+			}
+			
+			this.checkcollision = function(){
+				
+				if (this.hang){return;}
+				
+				for (blk in objarray){
+					
+					if (objarray[blk].id == 'bug'){
+							if (rectcollisoncheck(new Box(this.x - 5, this.y - 14, 10, 28), new Box(objarray[blk].x - 6, objarray[blk].y - 6, 12, 12))){ //collison x
+								if (objarray[blk].image_index == 0){
+									this.hp = this.maxhp;
+									snd_twinkle_b.play();
+									}
+								if (objarray[blk].image_index == 1){
+									this.hp += this.maxhp/2;
+									if (this.hp > this.maxhp){this.hp = this.maxhp;}
+									snd_twinkle_a.play();
+									}
+								if (objarray[blk].image_index == 2){
+									this.maxhp += 2;
+									this.hp = this.maxhp;
+									snd_twinkle_c.play();
+									}
+								if (objarray[blk].image_index == 7){
+									snd_cool.play();
+									}
+								if (objarray[blk].image_index == 12){
+									this.maxroar += 2;
+									snd_twinkle_c.play();
+									}
+								objarray.splice(objarray[blk].array_pos, 1);
+							}
+						}
+					
+					if (objarray[blk].id == 'hit' && this.hurt == false){
+						if (distanceTo(player, objarray[blk]) < objarray[blk].max_distance){
+							if (rectcollisoncheck(new Box(this.x - 5, this.y - 14, 10, 28), objarray[blk])){ //collison x
+									this.hurt = true;
+									this.vspeed = -5;
+									this.speed = objarray[blk].speed / 2;
+									this.sprite = sprite_simba_hurt;
+									this.image_index = 0;
+									this.counter = 0;
+									this.hp -= 1;
+									stopsounds();
+									snd_hurt.play();
+								}
+							}
+						}
+				
+					if (objarray[blk].id == 'leftledge'){
+						if (distanceTo(player, objarray[blk]) < objarray[blk].max_distance){
+							if (rectcollisoncheck(objarray[blk], new Box(this.x, this.y - 4, 30, 14))){
+								if (!this.hang && this.vspeed > 0 && this.sprite.index != 'simba_ledgedrop' && this.dir == 1){
+									this.dir = 1;
+									this.hang = true;
+									this.hangx = objarray[blk].x + 5;
+									this.hangy = objarray[blk].y;
+									this.jumping = true;
+									snd_grab.play();
+									}
+							}
+						}
+						
+					}
+					
+					if (objarray[blk].id == 'rightledge'){
+						if (distanceTo(player, objarray[blk]) < objarray[blk].max_distance){
+							if (rectcollisoncheck(objarray[blk], new Box(this.x - 30, this.y - 4, 40, 14))){
+								if (!this.hang && this.vspeed > 0 && this.sprite.index != 'simba_ledgedrop' && this.dir == -1){
+									this.dir = -1;
+									this.hang = true;
+									this.hangx = objarray[blk].x + 24;
+									this.hangy = objarray[blk].y;
+									this.jumping = true;
+									snd_grab.play();
+									}
+							}
+						}
+					}
+					
+					if (objarray[blk].type == 'bossblock'){
+						if (distanceTo(player, objarray[blk]) < objarray[blk].max_distance){
+							if (rectcollisoncheck(objarray[blk], new Box(this.x + this.hspeed - 5, this.y - 14, 10, 28))){ //collison x
+								snd_pridelands.pause();
+								snd_bugmusic.play();
+								snd_bugmusic.loop = true;
+								objarray.splice(objarray[blk].array_pos,1);
+								}
+							}
+						}
+					
+					if (objarray[blk].type == 'rblock'){
+						if (distanceTo(player, objarray[blk]) < objarray[blk].max_distance){
+							if (rectcollisoncheck(objarray[blk], new Box(this.x + this.hspeed - 5, this.y - 14, 10, 28))){ //collison x
+								this.sprite = sprite_simba_roll;
+								if (this.image_index < 4){this.image_index = 4;}
+								}
+							}
+						}
+						
+					if (objarray[blk].id == 'block'){
+								if (rectcollisoncheck(objarray[blk], new Box(this.x + this.hspeed - 5, this.y - 14, 10, 28))){ //collison x
+									if (rectcollisoncheck(objarray[blk], new Box(this.x + this.hspeed - 5, this.y - 22, 10, 28))){ //collison x
+										if (objarray[blk].type == 'block'){this.hspeed = 0;}
+									}
+									else {this.y -= 2;}
+								}
+								
+								if (rectcollisoncheck(objarray[blk], new Box(this.x - 5, this.y + this.vspeed - 14, 10, 28))){ //collison y
+									if (this.y > objarray[blk].y){ //top collision
+										if (objarray[blk].type == 'block'){this.vspeed = 1;}
+									}
+									
+									else if (this.y < objarray[blk].y){ //bottom collision
+										if (objarray[blk].type == 'block'){
+												this.vspeed = 0;
+												this.falling = 0; this.jumping = 0;
+												this.speed = 4;
+												if (this.sprite.index == 'simba_jump'){this.sprite = sprite_simba_highjump; this.image_index = 6;}
+											}
+										if (objarray[blk].type == 'tblock' && this.y + 14 < objarray[blk].y){
+												this.vspeed = 0;
+												this.falling = 0; this.jumping = 0;
+												this.speed = 4;
+												if (this.sprite.index == 'simba_jump'){this.sprite = sprite_simba_highjump; this.image_index = 6;}
+											}
+										}
+									}
+								
+							}
+					
+					if (objarray[blk].id == 'tpblock'){
+
+							maskx = this.x + this.hspeed + (9 * this.dir); maskx2 = this.x + this.hspeed - (9 * this.dir);
+							masky = this.y - this.vspeed + 11; masky2 = this.y + this.vspeed;
+							polymask = {coord_array : new Array({x:maskx, y: masky},{x:maskx, y:masky2},{x:maskx2, y: masky2},{x:maskx2, y: masky},{x:maskx, y: masky})};
+							if (!polygoncollisoncheck(objarray[blk], polymask)){
+								//Checks for a collision at point (x,y+vspeed)
+								if (this.hspeed != 0 && this.vspeed>0){
+									
+									maskx = this.x + this.hspeed + (9 * this.dir);maskx2 = this.x + this.hspeed - (9 * this.dir);
+									masky = this.y + 13;masky2 = this.y + 11;
+									polymask = {coord_array : new Array({x:maskx, y: masky},{x:maskx, y:masky2},{x:maskx2, y: masky2},{x:maskx2, y: masky},{x:maskx, y: masky})};
+									
+									if (polygoncollisoncheck(objarray[blk], polymask)){
+											masky = this.y + 13 - 14;
+											masky2 = this.y - 13 - 14;
+											
+											polymask = {coord_array : new Array({x:maskx, y: masky},{x:maskx, y:masky2},{x:maskx2, y: masky2},{x:maskx2, y: masky},{x:maskx, y: masky})};
+											if (polygoncollisoncheck(objarray[blk], polymask)){
+											}
+											else {this.y -= 3;}
+									}
+								}
+								
+								//Checks for a collision at point (x,y+vspeed)
+								if (this.vspeed > 0){
+									maskx = this.x + this.hspeed + (5 * this.dir); maskx2 = this.x + this.hspeed - (5 * this.dir);
+									masky = this.y + this.vspeed + 14; masky2 = this.y + this.vspeed + 12;
+									polymask = {coord_array : new Array({x:maskx, y: masky},{x:maskx, y:masky2},{x:maskx2, y: masky2},{x:maskx2, y: masky},{x:maskx, y: masky})};
+									if (polygoncollisoncheck(objarray[blk], polymask)){
+										this.vspeed = 0;
+										this.falling=false; this.jumping=false;
+										this.speed = 4;
+										if (this.sprite.index == 'simba_jump'){this.sprite = sprite_simba_highjump; this.image_index = 6;}
+									}
+								}
+							}
+						}
+					
+					
+					if (objarray[blk].id == 'polyblock'){
+					
+						//Checks for a collision at point (x,y+vspeed)
+						if (this.hspeed != 0){
+							maskx = this.x + this.hspeed + (9 * this.dir);
+							maskx2 = this.x + this.hspeed - (9 * this.dir);
+							masky = this.y + 13;
+							masky2 = this.y - 13;
+							polymask = {coord_array : new Array({x:maskx, y: masky},{x:maskx, y:masky2},{x:maskx2, y: masky2},{x:maskx2, y: masky},{x:maskx, y: masky})};
+							
+							if (polygoncollisoncheck(objarray[blk], polymask)){
+									masky = this.y + 13 - 9;
+									masky2 = this.y - 13 - 9;
+									
+									polymask = {coord_array : new Array({x:maskx, y: masky},{x:maskx, y:masky2},{x:maskx2, y: masky2},{x:maskx2, y: masky},{x:maskx, y: masky})};
+									if (polygoncollisoncheck(objarray[blk], polymask)){
+										this.hspeed = 0;
+									}
+									else {this.y -= 3;}
+							}
+						}
+						
+						//Checks for a collision at point (x,y+vspeed)
+						if (this.vspeed != 0){
+							maskx = this.x + this.hspeed + (5 * this.dir);
+							maskx2 = this.x + this.hspeed - (5 * this.dir);
+							masky = this.y + this.vspeed + 14;
+							masky2 = this.y + this.vspeed - 14;
+							polymask = {coord_array : new Array({x:maskx, y: masky},{x:maskx, y:masky2},{x:maskx2, y: masky2},{x:maskx2, y: masky},{x:maskx, y: masky})};
+							if (polygoncollisoncheck(objarray[blk], polymask)){
+								if (this.vspeed > 0){this.falling=false; this.jumping=false;}
+								this.speed = 4;
+								this.vspeed = 0;
+								if (this.sprite.index == 'simba_jump'){this.sprite = sprite_simba_highjump; this.image_index = 6;}
+							}
+						}
+					}
+				}
+					
+			}
+			
+			this.animationend = function(){
+					if (this.sprite.index == 'simba_highjump'){this.sprite = sprite_simba_stand;}
+					if (this.sprite.index == 'simba_turn'){this.sprite = sprite_simba_stand; this.dir = -this.dir; this.sprite_speed = 3;}
+					if (this.sprite.index == 'simba_roll'){this.sprite = sprite_simba_stand; this.hspeed = 0;}
+					if (this.sprite.index == 'simba_ledgepull'){this.sprite = sprite_simba_stand; this.hang = false; this.yoff = 0; this.xoff = 0;}
+					if (this.sprite.index == 'simba_ledgedrop'){this.sprite = sprite_simba_stand;}
+					if (this.sprite.index == 'simba_hurt'){this.sprite = sprite_simba_stand;}
+					if (this.sprite.index == 'simba_idle'){this.sprite = sprite_simba_stand;}
+					if (this.sprite.index == 'simba_pounce'){this.sprite = sprite_simba_stand; this.sprite_speed = 3;}
+					if (this.sprite.index == 'simba_roar'){this.sprite = sprite_simba_stand; this.sprite_speed = 3; this.roar = false;}
+			}
+			
+			return this;
+		}
+		
+		var Explo = function(x, y, image_index){
+				
+				this.id = 'explo';
+				this.x = x;
+				this.y = y;
+				this.image_index = image_index;
+				this.sprite = sprite_explo;
+				this.sprite_speed = 4;
+				this.counter = 0;
+				this.array_pos = particlearray.length - 1;
+				
+				this.step = function(){
+				
+					if (this.counter % this.sprite_speed == 0){
+						this.image_index += 1;
+						}
+					if (this.image_index > this.sprite.sprite_length){particlearray.splice(this.array_pos, 1);}
+					this.counter += 1;
+					if (this.counter > 5000){this.counter=0;}
+				
+					this.draw();
+				}
+				
+				this.draw = function(){
+					ctx.drawImage(this.sprite.image, this.sprite.sprite_width * this.image_index, 0, this.sprite.sprite_width, 
+								this.sprite.sprite_height, this.x + this.sprite.xoffset, this.y + this.sprite.yoffset, this.sprite.sprite_width, this.sprite.sprite_height);
+				}
+				
+				return this;
+		}
+		
+		var SegaLogo = function(){
+				
+			this.id = 'sega';
+			this.x = canvas.width/2;
+			this.y = canvas.height/2;
+			this.image_index = 0;
+			this.sprite = sprite_sega;
+			this.sprite_speed = 4;
+			this.counter = 0;
+			this.array_pos = 0;
+				
+			this.step = function(){
+			
+				if (this.counter % this.sprite_speed == 0){
+					this.image_index += 1;
+					}
+				if (this.image_index > this.sprite.sprite_length){this.image_index = 0;}
+				this.counter += 1;
+				if (this.counter > 5000){this.counter=0;}
+			
+				this.draw();
+			}
+			
+			this.draw = function(){
+				ctx.drawImage(this.sprite.image, this.sprite.sprite_width * this.image_index, 0, this.sprite.sprite_width, 
+							this.sprite.sprite_height, Math.round(this.x)/scale + this.sprite.xoffset, Math.round(this.y)/scale + this.sprite.yoffset, this.sprite.sprite_width, this.sprite.sprite_height);
+			}
+			
+			return this;
+		}
+		
+		var Fade = function(){
+			this.id = "fade";
+			this.x = 0;
+			this.y = 0;
+			this.depth = 5000;
+			this.array_pos = objarray.length - 1;
+			this.timer = 100;
+			
+			this.step = function(){
+			
+				this.timer--;	
+					
+				ctx.globalAlpha = this.timer/100;
+				ctx.fillRect(camX,camY,canvas.width, canvas.height);
+				ctx.globalAlpha = 1;
+				
+				if (this.timer <= 1){objarray.splice(this.array_pos, 1);}
+			}
+			
+			this.draw = function(){
+				return;
+			}
+			
+			return this;
+		}
+		
+		var JungleCover = function(){
+				
+				this.x = 0;
+				this.y = 0;
+				this.depth = 600;
+				
+				this.draw = function(){
+				
+					ctx.drawImage(sprite_junglecover1.image, 1441, 597);
+					ctx.drawImage(sprite_junglecover2.image, 1257, 914);
+					ctx.drawImage(sprite_jungletrees.image, 284, 73);
+
+				}
+				
+				this.step = function(){
+					this.draw();
+				}
+				
+				return this;
+		}
+		
+		var Item = function(id, x, y, sprite, image_index){
+				
+				this.id = id;
+				this.x = x;
+				this.y = y;
+				this.image_index = image_index;
+				this.sprite = sprite;
+				this.sprite_speed = 4;
+				this.counter = 0;
+				this.depth = 0;
+				
+				this.step = function(){
+				
+					if (this.counter % this.sprite_speed == 0){
+						this.sprite_index += 1;
+						}
+					if (this.sprite_index > this.sprite.sprite_length){this.sprite_index=0;}
+					this.counter += 1;
+					if (this.counter > 5000){this.counter=0;}
+				
+					this.draw();
+				}
+				
+				this.draw = function(){
+					ctx.drawImage(this.sprite.image, this.sprite.sprite_width * this.image_index, 0, this.sprite.sprite_width, 
+								this.sprite.sprite_height, this.x + this.sprite.xoffset, this.y + this.sprite.yoffset, this.sprite.sprite_width, this.sprite.sprite_height);
+				}
+				
+				return this;
+		}
+		
+		var Porc = function(x, y, d_id){
+
+				this.id = 'porc';
+				this.sprite = sprite_porc;
+				this.image_index = 0;
+				this.sprite_speed = 4;
+				this.counter = 0;
+				this.debug_id = d_id;
+				
+				this.flipped = false;
+				
+				this.depth = 0;
+				
+				this.array_pos = objarray.length - 1;
+				
+				this.vsp = 0;
+				this.hsp = 0;
+				this.xoff = 0;
+				this.yoff = 0;
+				
+				this.x = x;
+				this.y = y;
+				this.grav = 0.5;
+
+				this.turning = false;
+				this.goleft = false;
+				this.goright = false;
+				this.goup = false;
+				this.godown = false;
+				
+				this.dead = false;
+				
+				this.die = false;
+				this.dir = 1;
+				this.a0 = 50;
+				
+				this.angle = 0;
+				
+				this.jumping = false;
+				this.falling = true;
+				
+				this.draw = function(){
+					
+					if (this.flipped && this.angle < Math.PI){
+						this.angle += 6 * Math.PI / 180;
+					}
+
+					ctx.translate(this.x, this.y);
+					ctx.rotate(this.angle);
+					ctx.translate(-this.x, -this.y);
+					
+					ctx.scale(this.dir,1);
+					ctx.drawImage(this.sprite.image, this.sprite.sprite_width * this.image_index, 0, this.sprite.sprite_width, 
+								this.sprite.sprite_height, (this.x * this.dir) + this.sprite.xoffset + (this.xoff * this.dir), this.y + this.sprite.yoffset + this.yoff, this.sprite.sprite_width, this.sprite.sprite_height);
+					ctx.scale(this.dir,1);
+					
+					ctx.translate(this.x, this.y);
+					ctx.rotate(-this.angle);
+					ctx.translate(-this.x, -this.y);
+					
+					if (debug){
+					ctx.globalAlpha = 0.5;
+					ctx.fillStyle = 'blue';
+					ctx.fillRect(this.x - 12, this.y-7, 24, 14);
+					ctx.style = 'black';
+					ctx.globalAlpha = 1;
+					}
+				}
+				
+				 this.step = function(){
+			
+					if (distanceTo(this, player) > 200){
+							if (this.dead){
+								objarray.splice(this.array_pos,1);
+							}
+							if (this.flipped){!this.flipped;}
+						}
+						
+					if (distanceTo(player, this) > 300) {return;}
+				 
+					if (this.counter % this.sprite_speed == 0){
+						this.image_index += 1;
+						}
+					if (this.image_index > this.sprite.sprite_length){this.animationend(); this.image_index=0;}
+					this.counter += 1;
+					if (this.counter > 5000){this.counter=0;}
+				 
+					if (this.turning == true){
+							if (this.image_index < 6){this.image_index = 6}
+						}
+					else if (this.goright==false && this.goleft==false){this.image_index = 0}
+					else if (this.goright == true || this.goleft == true){
+							if (this.image_index > 5){this.image_index = 0;}
+						}
+					
+					this.a0--;							//ALARMS
+					if (this.a0==1){this.alarm0();}
+					
+					if (this.goright == true){this.hsp = 1; this.dir = 1;}
+					if (this.goleft == true){this.hsp = -1; this.dir = -1;}
+					if (this.goright == false && this.goleft == false){this.hsp = 0;}
+					if (this.falling || this.jumping){this.vsp += this.grav;}
+					this.collisoncheck();
+					
+					if (this.flipped != 0){this.hsp = 0;}
+					
+					this.x += this.hsp;
+					this.y += this.vsp;
+					this.draw();
+				}
+				
+				this.alarm0 = function(){
+					r = irandom_range(0,2)
+					
+					if (r == 0){this.goleft=false;this.goright=false;}
+					if (r == 1){this.goleft=false;this.goright=false; this.turning = true;}
+					if (r == 2){
+							if (this.dir == -1){this.goright = false; this.goleft = true;}
+							else {this.goright = true; this.goleft = false;}
+						}
+					
+					this.a0 = irandom_range(50,60);
+				}
+				
+				this.collisoncheck = function(){
+				
+					if (this.dead){return;}
+				
+					for (blk in objarray){
+					
+						if (objarray[blk].id == 'player'){
+							if (rectcollisoncheck(new Box(objarray[blk].x - 10, objarray[blk].y, 20, 28) , new Box(this.x - 12, this.y, 24, 14))){ //collison x
+								if (objarray[blk].vspeed > 1 && this.flipped){
+										objarray[blk].vspeed = -5;
+										objarray[blk].speed = objarray[blk].speed/2;
+										objarray[blk].sprite = sprite_simba_pounce;
+										objarray[blk].image_index = 0;
+										stopsounds();
+										snd_hit_b.play();
+										this.dead = true;
+										this.vsp = - 6;
+									}
+								else if (objarray[blk].sprite.index == 'simba_roll' && !this.flipped) {
+									this.flipped = true;
+									stopsounds();
+									snd_hit_b.play();
+									this.vsp = -9;
+								}
+								else if (!objarray[blk].hurt && this.vsp >= 0) {
+									objarray[blk].hurt = true;
+									objarray[blk].vspeed = -5;
+									objarray[blk].speed = objarray[blk].speed / 2;
+									objarray[blk].sprite = sprite_simba_hurt;
+									objarray[blk].image_index = 0;
+									objarray[blk].counter = 0;
+									objarray[blk].hp -= 1;
+									stopsounds();
+									snd_hurt.play();
+								}
+							}
+						}
+					
+						if (objarray[blk].id == 'roarbox'){
+							if (rectcollisoncheck(objarray[blk], new Box(this.x + this.hsp - 12, this.y - 7, 24, 14))){ //collison x
+									this.flipped = true;
+									snd_hit_b.play();
+									this.vsp = -6;
+								}
+							}
+					
+						if (objarray[blk].id == 'block'){
+							if (rectcollisoncheck(objarray[blk], new Box(this.x + this.hsp - 12, this.y - 7, 24, 14))){ //collison x
+								if (rectcollisoncheck(objarray[blk], new Box(this.x + this.hsp - 12, this.y - 18, 24, 14))){ //collison x
+									if (objarray[blk].type == 'eblock'){this.hsp = 0;this.turning = true;}
+									if (objarray[blk].type == 'block'){this.hsp = 0;}
+									if (objarray[blk].type == 'tblock'){this.hsp = 0;}
+								}
+								else {this.y -= 2;}
+							}
+							
+							if (rectcollisoncheck(objarray[blk], new Box(this.x - 12, this.y + this.vsp - 7, 24, 14))){ //collison y
+								if (this.y > objarray[blk].y){ //top collision
+									if (objarray[blk].type == 'block'){this.vsp = 1;}
+									if (objarray[blk].type == 'eblock'){this.vsp = 1;}
+								}
+								
+								else if (this.y < objarray[blk].y){ //bottom collision
+									if (objarray[blk].type == 'eblock'){
+											this.vsp = 0;
+										}
+									if (objarray[blk].type == 'block'){
+											this.vsp = 0;
+										}
+									if (objarray[blk].type == 'tblock'){
+											this.vsp = 0;
+										}
+									}
+								
+								}
+							}
+						}
+					}	
+				
+				this.animationend = function(){
+					if (this.turning == true){
+						this.dir = -this.dir; 
+						this.turning = false; 
+						if (this.dir == -1){this.goright = false; this.goleft = true;}
+						else {this.goright = true; this.goleft = false;}
+						}
+				}
+				
+				return this;
+		}
+
+		var Iggy = function(x, y, d_id){
+
+				this.id = 'iggy';
+				this.sprite = sprite_iggy;
+				this.image_index = 0;
+				this.sprite_speed = 4;
+				this.counter = 0;
+				this.debug_id = d_id;
+				
+				this.depth = 0;
+				
+				this.array_pos = objarray.length - 1;
+				
+				this.vsp = 0;
+				this.hsp = 0;
+				this.xoff = 0;
+				this.yoff = 0;
+				
+				this.x = x;
+				this.y = y;
+				this.grav = 0.5;
+
+				this.turning = false;
+				this.goleft = false;
+				this.goright = false;
+				this.goup = false;
+				this.godown = false;
+				
+				this.die = false;
+				this.dir = 1;
+				this.a0 = 50;
+				
+				this.jumping = false;
+				this.falling = true;
+				
+				this.attack = false;
+				
+				 this.draw = function(){
+				 
+					ctx.scale(this.dir,1);
+					ctx.drawImage(this.sprite.image, this.sprite.sprite_width * this.image_index, 0, this.sprite.sprite_width, 
+								this.sprite.sprite_height, (this.x * this.dir) + this.sprite.xoffset, this.y + this.sprite.yoffset + this.yoff, this.sprite.sprite_width, this.sprite.sprite_height);
+					ctx.scale(this.dir,1);
+					
+					if (debug){
+					ctx.globalAlpha = 0.5;
+					ctx.fillStyle = 'blue';
+					if (this.dir == -1){this.xoff = 20;}
+					if (this.dir == 1){this.xoff = 8;}
+					ctx.fillRect(this.x - this.xoff, this.y-7, 28, 10);
+					ctx.style = 'black';
+					ctx.globalAlpha = 1;
+					
+					ctx.beginPath();
+					ctx.arc(this.x,this.y,1,0,2*Math.PI);
+					ctx.fill();ctx.fillText(this.debug_id, this.x, this.y);
+					
+					}
+				}
+				
+				this.step = function(){
+
+					if (distanceTo(player, this) > 300) {return;}
+				
+					if (this.counter % this.sprite_speed == 0){
+						this.image_index += 1;
+						}
+					if (this.image_index > this.sprite.sprite_length){this.animationend(); this.image_index=0;}
+					this.counter += 1;
+					if (this.counter > 5000){this.counter=0;}
+				 
+					if (this.attack == true){
+							if (this.image_index < 11){this.image_index = 11; this.sprite_speed = 5;}
+							if (this.image_index > 17){this.attack = false; this.animationend(); this.sprite_speed = 5;}
+						}
+					else if (this.turning == true){
+							if (this.image_index < 6){this.image_index = 6}
+							if (this.image_index > 10){this.animationend();}
+						}
+					else if (this.goright==false && this.goleft==false){this.image_index = 0}
+					else if (this.goright == true || this.goleft == true){
+							if (this.image_index > 5){this.image_index = 0;}
+						}
+					
+					this.a0--;							//ALARMS
+					if (this.a0==1){this.alarm0();}
+					
+					if (this.goright == true){this.hsp = 1; this.dir = 1;}
+					if (this.goleft == true){this.hsp = -1; this.dir = -1;}
+					if (this.goright == false && this.goleft == false){this.hsp = 0;}
+					this.vsp += this.grav;
+					this.collisoncheck();
+					
+					this.x += this.hsp;
+					this.y += this.vsp;
+					this.draw();
+					
+					this.draw();
+
+				}
+				
+				this.alarm0 = function(){
+					r = irandom_range(0,4)
+					
+					if (r == 0){this.goleft=false;this.goright=false;}
+					if (r == 1){this.goleft=false;this.goright=false; this.turning = true;}
+					if (r == 2){
+							if (this.dir == -1){this.goright = false; this.goleft = true;}
+							else {this.goright = true; this.goleft = false;}
+						}
+					
+					if ((r == 3) && distanceTo(this, player) < 250){ 
+							this.goleft = false; 
+							this.goright=false
+							if ((this.x < player.x && this.dir == 1) || (this.x > player.x && this.dir == -1)){this.attack = true; snd_iggy.currentTime = 0; snd_iggy.play(); objarray[objarray.length] = new HitBox('hit', this.x-5, this.y-5, 10, 10, 0, this.dir * 1.8, 30);}
+							else {this.turning = true;}
+						}
+					
+					this.a0 = irandom_range(50,60);
+				}
+				
+				this.collisoncheck = function(){
+					
+					if (this.dir == -1){this.xoff = 18;}
+					if (this.dir == 1){this.xoff = 10;}
+					this.yoff = -6;
+					
+					for (blk in objarray){
+					
+						if (objarray[blk].id == 'player'){
+							if (rectcollisoncheck(new Box(objarray[blk].x - 10, objarray[blk].y, 20, 28) , new Box(this.x - this.xoff, this.y, 28, 17))){ //collison x
+								if (objarray[blk].vspeed > 1){
+										particlearray[particlearray.length] = new Explo(this.x, this.y, 4);
+										objarray[blk].vspeed = -5;
+										objarray[blk].speed = objarray[blk].speed/2;
+										objarray[blk].sprite = sprite_simba_pounce;
+										objarray[blk].image_index = 0;
+										objarray.splice(this.array_pos, 1);
+										stopsounds();
+										snd_hit_a.play();
+										return;
+									}
+								else if (!objarray[blk].hurt) {
+									objarray[blk].hurt = true;
+									objarray[blk].vspeed = -5;
+									objarray[blk].speed = objarray[blk].speed / 2;
+									objarray[blk].sprite = sprite_simba_hurt;
+									objarray[blk].image_index = 0;
+									objarray[blk].counter = 0;
+									objarray[blk].hp -= 1;
+									stopsounds();
+									snd_hurt.play();
+								}
+							}
+						}
+						
+						if (objarray[blk].id == 'block'){
+							if (rectcollisoncheck(objarray[blk], new Box(this.x + this.hsp - this.xoff, this.y - 7, 28, 10))){ //collison x
+								if (rectcollisoncheck(objarray[blk], new Box(this.x + this.hsp - this.xoff, this.y - 18, 28, 10))){ //collison x
+									if (objarray[blk].type == 'eblock'){this.hsp = 0;this.turning = true;}
+									if (objarray[blk].type == 'block' || objarray[blk].type == 'tblock'){this.hsp = 0;}
+								}
+								else {this.y -= 2;}
+							}
+							
+							if (rectcollisoncheck(objarray[blk], new Box(this.x - this.xoff, this.y + this.vsp - 7, 28, 10))){ //collison y
+								if (this.y > objarray[blk].y){ //top collision
+									if (objarray[blk].type == 'block' || objarray[blk].type == 'tblock'){this.vsp = 1;}
+									if (objarray[blk].type == 'eblock'){this.vsp = 1;}
+								}
+								
+								else if (this.y < objarray[blk].y){ //bottom collision
+									if (objarray[blk].type == 'eblock'){
+											this.vsp = 0;
+										}
+									if (objarray[blk].type == 'block'){
+											this.vsp = 0;
+										}
+									if (objarray[blk].type == 'tblock'){
+											this.vsp = 0;
+										}
+									}
+								
+								}
+							}
+							
+												
+						if (objarray[blk].id == 'polyblock' || objarray[blk].id == 'tpblock'){
+						
+							//Checks for a collision at point (x,y+vspeed)
+								if (this.hsp != 0){
+									maskx = this.x + this.hsp - this.xoff;
+									maskx2 = this.x + this.hsp - this.xoff;
+									masky = this.y + 7;
+									masky2 = this.y - 7;
+									polymask = {coord_array : new Array({x:maskx, y: masky},{x:maskx, y:masky2},{x:maskx2, y: masky2},{x:maskx2, y: masky},{x:maskx, y: masky})};
+									
+									if (polygoncollisoncheck(objarray[blk], polymask)){
+											masky = this.y + 7 - 9;
+											masky2 = this.y - 7 - 9;
+											
+											polymask = {coord_array : new Array({x:maskx, y: masky},{x:maskx, y:masky2},{x:maskx2, y: masky2},{x:maskx2, y: masky},{x:maskx, y: masky})};
+											if (polygoncollisoncheck(objarray[blk], polymask)){
+												this.hsp = 0;
+											}
+											else {this.y -= 3;}
+									}
+								}
+								
+								//Checks for a collision at point (x,y+vspeed)
+								if (this.vspeed != 0){
+									maskx = this.x + this.hsp - this.xoff;
+									maskx2 = this.x + this.hsp - this.xoff;
+									masky = this.y + this.vsp + 7;
+									masky2 = this.y + this.vsp - 7;
+									polymask = {coord_array : new Array({x:maskx, y: masky},{x:maskx, y:masky2},{x:maskx2, y: masky2},{x:maskx2, y: masky},{x:maskx, y: masky})};
+									if (polygoncollisoncheck(objarray[blk], polymask)){
+										this.vsp = 0;
+									}
+								}
+							}
+						}
+					}	
+				
+				this.animationend = function(){
+					if (this.turning == true){
+						this.dir = -this.dir; 
+						this.turning = false; 
+						if (this.dir == -1){this.goright = false; this.goleft = true;}
+						else {this.goright = true; this.goleft = false;}
+						}
+				}
+				
+				return this;
+		}
+
+		var Buggo = function(x, y, d_id){
+
+				this.id = 'buggo';
+				this.sprite = sprite_buggo;
+				this.image_index = 0;
+				this.sprite_speed = 4;
+				this.counter = 0;
+				this.debug_id = d_id;
+				this.depth = 0;
+				
+				this.vsp = 0;
+				this.hsp = 0;
+				this.xoff = 0;
+				this.yoff = 0;
+				
+				this.x = x;
+				this.y = y;
+				this.grav = 0.5;
+
+				this.array_pos = objarray.length - 1;
+				
+				this.turning = false;
+				this.goleft = false;
+				this.goright = false;
+				this.goup = false;
+				this.godown = false;
+				
+				this.path = [];
+				this.path_index = 0;
+				this.die = false;
+				this.dir = 1;
+				this.a0 = 50;
+				
+				this.jumping = false;
+				this.falling = true;
+				
+				 this.draw = function(){
+				 
+					ctx.scale(this.dir,1);
+					ctx.drawImage(this.sprite.image, this.sprite.sprite_width * this.image_index, 0, this.sprite.sprite_width, 
+								this.sprite.sprite_height, (this.x * this.dir) + this.sprite.xoffset + (this.xoff * this.dir), this.y + this.sprite.yoffset + this.yoff, this.sprite.sprite_width, this.sprite.sprite_height);
+					ctx.scale(this.dir,1);
+					
+					if (debug){
+					ctx.globalAlpha = 0.5;
+					ctx.fillStyle = 'blue';
+					ctx.fillRect(this.x - 8, this.y-7, 16, 14);
+					ctx.style = 'black';
+					ctx.globalAlpha = 1;
+					}
+				}
+				
+				 this.step = function(){
+	
+					if (distanceTo(player, this) > 300) {return;}
+				 
+					if (this.counter % this.sprite_speed == 0){
+						this.image_index += 1;
+						}
+					if (this.image_index > this.sprite.sprite_length){this.animationend(); this.image_index=0;}
+					this.counter += 1;
+					if (this.counter > 5000){this.counter=0;}
+				 
+					if (this.die == true){
+							this.y -= 0.5;
+							this.hsp = 0;
+							this.vsp = 0;
+							
+							if (this.x < player.x){this.x+=1;}
+							if (this.x > player.x){this.x-=1;}
+							if (this.y < player.y){this.y+=1;}
+							if (this.y > player.y){this.y-=1;}
+							
+							if (this.counter > 70){
+								particlearray[particlearray.length] = new Explo(this.x, this.y, 0);
+								objarray.splice(this.array_pos, 1);
+								objarray[objarray.length] = new HitBox('hit', this.x-35, this.y-30, 70, 60, 0, 0, 30);
+								stopsounds();
+								snd_explo.play();
+							}
+							
+							if (this.image_index < 7){this.image_index = 7; this.sprite_speed = 5;}
+							if (this.image_index > 11){this.image_index = 7; this.sprite_speed = 5;}
+						}
+					else if (this.turning == true){
+							if (this.image_index < 5){this.image_index = 5}
+							if (this.image_index > 6){this.animationend();}
+						}
+					else if (this.goright==false && this.goleft==false){this.image_index = 0}
+					else if (this.goright == true || this.goleft == true){
+							if (this.image_index > 5){this.image_index = 0;}
+						}
+					
+					this.a0--;							//ALARMS
+					if (this.a0==1){this.alarm0();}
+					
+					if (this.goright == true){this.hsp = 1; this.dir = 1;}
+					if (this.goleft == true){this.hsp = -1; this.dir = -1;}
+					if (this.goright == false && this.goleft == false){this.hsp = 0;}
+					
+					this.vsp += this.grav;
+					if (this.die){
+						this.vsp = 0;
+						this.hsp = 0;
+					}
+					
+					this.collisoncheck();
+					
+					this.x += this.hsp;
+					this.y += this.vsp;
+					
+					this.draw();
+
+				}
+				
+				this.alarm0 = function(){
+					r = irandom_range(0,4)
+					
+					if (r == 0){this.goleft=false;this.goright=false;}
+					if (r == 1){this.goleft=false;this.goright=false; this.turning = true;}
+					if (r == 2){
+							if (this.dir == -1){this.goright = false; this.goleft = true;}
+							else {this.goright = true; this.goleft = false;}
+						}
+					
+					this.a0 = irandom_range(50,60);
+				}
+				
+				this.collisoncheck = function(){
+					for (blk in objarray){
+					
+						if (this.die){return;}
+					
+						if (objarray[blk].id == 'player'){
+							if (rectcollisoncheck(new Box(objarray[blk].x - 10, objarray[blk].y, 20, 28) , new Box(this.x - 8, this.y, 16, 14))){ //collison x
+								if (objarray[blk].vspeed > 1){
+										this.die = true;
+										objarray[blk].vspeed = -5;
+										objarray[blk].speed = objarray[blk].speed/2;
+										objarray[blk].sprite = sprite_simba_pounce;
+										objarray[blk].image_index = 0;
+										stopsounds();
+										snd_hit_b.play();
+										this.counter = 0;
+										
+										this.path = new Array({x:this.x - (3 * this.dir),y:this.y - 16},{x:this.x + (10 * this.dir),y:this.y - 10}, {x:this.x - (6 * this.dir),y:this.y - 7});
+									}
+								else if (!objarray[blk].hurt) {
+									objarray[blk].hurt = true;
+									objarray[blk].vspeed = -5;
+									objarray[blk].speed = objarray[blk].speed / 2;
+									objarray[blk].sprite = sprite_simba_hurt;
+									objarray[blk].image_index = 0;
+									objarray[blk].counter = 0;
+									objarray[blk].hp -= 1;
+									stopsounds();
+									snd_hurt.play();
+								}
+							}
+						}
+						
+						if (objarray[blk].id == 'block'){
+							if (rectcollisoncheck(objarray[blk], new Box(this.x + this.hsp - 8, this.y - 7, 16, 14))){ //collison x
+								if (rectcollisoncheck(objarray[blk], new Box(this.x + this.hsp - 8, this.y - 18, 16, 14))){ //collison x
+									if (objarray[blk].type == 'eblock'){this.hsp = 0; this.turning = true;}
+									if (objarray[blk].type == 'block'){this.hsp = 0;}
+									if (objarray[blk].type == 'tblock'){this.hsp = 0;}
+								}
+								else {this.y -= 2;}
+							}
+							
+							if (rectcollisoncheck(objarray[blk], new Box(this.x - 8, this.y + this.vsp - 7, 16, 14))){ //collison y
+								if (this.y > objarray[blk].y){ //top collision
+									if (objarray[blk].type == 'block'){this.vsp = 1;}
+									if (objarray[blk].type == 'eblock'){this.vsp = 1;}
+								}
+								
+								else if (this.y < objarray[blk].y){ //bottom collision
+									if (objarray[blk].type == 'eblock'){
+											this.vsp = 0;
+										}
+									if (objarray[blk].type == 'block'){
+											this.vsp = 0;
+										}
+									if (objarray[blk].type == 'tblock'){
+											this.vsp = 0;
+										}
+									}
+								
+								}
+							}
+						}
+					}	
+				
+				this.animationend = function(){
+					if (this.turning == true){
+						this.dir = -this.dir; 
+						this.turning = false; 
+						if (this.dir == -1){this.goright = false; this.goleft = true;}
+						else {this.goright = true; this.goleft = false;}
+						}
+				}
+				
+				return this;
+		}
+
+		
+		var LedgeBox = function(id, x, y, notimportant, notimportant, d_id){
+			this.id = id; //either left or right ledgebox
+			this.x = x;
+			this.y = y;
+			this.width = 10;
+			this.height = 10;
+			this.depth = 0;
+			this.debug_id = d_id;
+			this.array_pos = objarray.length - 1;
+			
+			this.max_distance = 20;
+			
+			this.step = function(){
+				this.draw();
+			}
+			
+			this.draw = function(){
+				if (debug == true){
+					ctx.globalAlpha=0.4;
+					ctx.fillStyle = 'purple'; 		//Color of the text and forms
+					ctx.fillRect(this.x, this.y, this.width, this.height);	//Draw Rectangle ... fillRect(startX, startY, width, height);
+					ctx.fillStyle = 'blue'; 			//Color of the text and forms
+					ctx.globalAlpha=1;
+					ctx.fillText(this.debug_id, this.x, this.y);
+					}
+			}
+			
+			return this;
+		}
+		
+		function Poly(coord_array, d_id){
+			this.id = "polyblock";
+			this.x = 0;
+			this.y = 0;
+			this.depth = 700;
+			this.debug_id = d_id;
+			this.array_pos = objarray.length - 1;
+			this.coord_array = coord_array;
+			
+			this.step = function(){
+
+				if (debug){
+					ctx.strokeStyle = 'blue';
+					ctx.beginPath();
+					ctx.moveTo(this.coord_array[0].x,this.coord_array[0].y);
+					for (poly_i in this.coord_array){
+						ctx.lineTo(this.coord_array[poly_i].x,this.coord_array[poly_i].y);
+						ctx.stroke();
+					}
+					ctx.strokeStyle = 'black';
+				}
+			}
+			
+			return this;
+		}
+		
+		function ThroughPoly(coord_array, d_id){
+			this.id = "tpblock";
+			this.x = 0;
+			this.y = 0;
+			this.depth = 700;
+			this.debug_id = d_id;
+			this.array_pos = objarray.length - 1;
+			this.coord_array = coord_array;
+			
+			this.step = function(){
+
+				if (debug){
+					ctx.strokeStyle = 'red';
+					ctx.beginPath();
+					ctx.moveTo(this.coord_array[0].x,this.coord_array[0].y);
+					for (poly_i in this.coord_array){
+						ctx.lineTo(this.coord_array[poly_i].x,this.coord_array[poly_i].y);
+						ctx.stroke();
+					}
+					ctx.strokeStyle = 'black';
+				}
+			}
+			
+			return this;
+		}
+		
+		//POLYGON COLLISION DETECTION//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+		function polygonpointcollisoncheck(polygon, x, y){ //returns true if point lie inside polygon
+			
+			var leftcount = 0;
+			var rightcount = 0;
+			
+			for (j=0; j < polygon.coord_array.length - 1; j++){
+					
+					calcs += 1; //ADD CALC
+					
+					ax = polygon.coord_array[j].x;
+					ay = polygon.coord_array[j].y;
+					
+					bx = polygon.coord_array[j+1].x;
+					by = polygon.coord_array[j+1].y;
+					
+					cx = x;
+					cy = y;
+					
+					if (cy < max(ay, by) && cy > min(ay, by)){
+						if (((bx - ax)*(cy - ay) - (by - ay)*(cx - ax)) > 0){rightcount++;}
+						else {leftcount++;}
+					}
+					
+				}
+			
+			if (leftcount != rightcount){return true;}
+			else {return false;}
+		}
+		
+		function polygoncollisoncheck(polygon, polygon2){ //returns true if collison between a polygon and another polygon
+
+			for (j1=0; j1 < polygon.coord_array.length - 1; j1++){
+					if (polygonpointcollisoncheck(polygon2, polygon.coord_array[j1].x, polygon.coord_array[j1].y)){return true;}
+					calcs += 1; //ADD CALC
+				}
+				
+			for (j2=0; j2 < polygon2.coord_array.length - 1; j2++){
+					if (polygonpointcollisoncheck(polygon, polygon2.coord_array[j2].x, polygon2.coord_array[j2].y)){return true;}	
+					calcs += 1; //ADD CALC
+				}
+				
+			return false;	
+		}
+		
+		//RECTANGULAR COLLISION DETECTION//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+		function rectcollisoncheck(r1, r2) { //returns true if collision
+			calcs += 1; //ADD CALC
+			return  !(r2.x > r1.x+r1.width || 
+				   r2.x+r2.width < r1.x || 
+				   r2.y > r1.y+r1.height ||
+				   r2.y+r2.height < r1.y);
+		}
+		
+		///HELPFUL FUNCTIONS///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+		function irandom_range(a1, b1){ //returns random interger between a1 and b1
+			return Math.round(Math.random() * (Math.max(a1,b1) - Math.min(a1,b1)) + Math.min(a1,b1));
+		}
+
+		function randomrange(a1, b1){ //returns random interger between a1 and b1
+			 return Math.random() * (Math.max(a1,b1) - Math.min(a1,b1)) + Math.min(a1,b1);
+		}
+
+		function distanceTo(o1, o2){ //returns distance between two objects/boxs x,y values
+			var xs = 0;
+			var ys = 0;
+
+			xs = o1.x - o2.x;
+			xs = xs * xs;
+			ys = o1.y - o2.y;
+			ys = ys * ys;
+				
+			return Math.sqrt( xs + ys );
+		}
+
+		function angleBetweenObjects(selfobj, target){ //returns the angle between to objects
+			var targetX = target.x + target.width/2 - selfobj.x;
+			var targetY = target.y + target.height/2 - selfobj.y;
+
+			return Math.atan2(targetY, targetX);
+		}
+		
+		function max(a, b){
+			if (a > b){return a;}
+			else {return b;}
+			
+		}
+		
+		function min(a, b){
+			if (a < b){return a;}
+			else {return b;}
+		}
+			
+		function stopsounds(){
+			snd_hurt.pause();
+			snd_hurt.currentTime = 0;
+			snd_cool.pause();
+			snd_cool.currentTime = 0;
+			snd_dakingreturns.pause();
+			snd_dakingreturns.currentTime = 0;
+			snd_explo.pause();
+			snd_explo.currentTime = 0;
+			snd_grab.pause();
+			snd_grab.currentTime = 0;
+			snd_grrr.pause();
+			snd_grrr.currentTime = 0;
+			snd_hit_a.pause();
+			snd_hit_a.currentTime = 0;
+			snd_hit_b.pause();
+			snd_hit_b.currentTime = 0;
+			snd_huffpuff.pause();
+			snd_huffpuff.currentTime = 0;
+			snd_roar.pause();
+			snd_roar.currentTime = 0;
+			snd_savepoint.pause();
+			snd_savepoint.currentTime = 0;
+			snd_twinkle_a.pause();
+			snd_twinkle_a.currentTime = 0;
+			snd_twinkle_b.pause();
+			snd_twinkle_b.currentTime = 0;
+			snd_twinkle_c.pause();
+			snd_twinkle_c.currentTime = 0;
+		}
+			
+		////////CONSOLE///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+		////CONSOLE IS AN OBJECT
+		function Console(){
+			
+			this.id = "cntrl";
+			this.x = 0;
+			this.y = 0;
+			this.depth = 8999;
+			this.debug_id = 'cntrl';
+			this.array_pos = objarray.length - 1;
+			
+			this.objtype = '';
+			this.grid = 0;
+			this.snap = true;
+			this.clickobjref = "";
+			this.console = false;
+			this.createobj = false;
+			this.creationref = "";
+			this.newobjcounter = 0;
+			this.blink = 0;
+			this.typetext = "";
+			this.newobjectsstring = "New Objects:\n";
+			this.executionlist = [];
+			this.listposition = 0;
+			this.pressentertext = 'Press ENTER When Finished'
+			this.blocktext = 'Press ENTER When Finished, Press DELETE to Undo'
+			
+			this.step = function(){
+				
+				ctx.scale(1/scale, 1/scale);
+				//ctx.imageSmoothingEnabled = false;
+				
+				if (this.grid != 0){
+					ctx.globalAlpha = 0.8;
+					for (g_h = this.grid; g_h < canvas.width; g_h+=this.grid){
+						ctx.beginPath();
+						ctx.moveTo(g_h,0);
+						ctx.lineTo(g_h,canvas.height);
+						ctx.stroke();
+					}
+					
+					
+					for (g_v = this.grid; g_v < canvas.height; g_v+=this.grid){
+						ctx.beginPath();
+						ctx.moveTo(0, g_v);
+						ctx.lineTo(canvas.width, g_v);
+						ctx.stroke();
+					}
+					ctx.globalAlpha = 1;
+
+
+				}
+				
+				if (this.createobj){this.typetext = this.blocktext;}
+				this.blink += 1;
+				if (this.blink > 60){this.blink = 0;}
+				
+				if (this.console){
+					ctx.font = "normal normal normal 16px pixelFJ8pt1__";
+					ctx.fillStyle = 'black';
+					ctx.globalAlpha = 0.8;
+					ctx.fillRect(0,0,canvas.width,80);
+					ctx.globalAlpha = 1;
+					
+					ctx.fillStyle = 'white';
+					{ctx.fillText("FPS: " + FPS, 10, 20);} //DRAW VARIBLES
+					
+					ctx.fillText(">",10, 70);
+					if (this.blink < 30){ctx.fillText(this.typetext + "_", 24, 70);}
+					else {ctx.fillText(this.typetext, 24, 70);}
+					ctx.fillStyle = 'black';
+				}
+				
+				ctx.scale(scale, scale);
+			}
+			
+			this.type = function(arg){
+				key = String.fromCharCode(arg);
+				if (arg == 192){
+						this.typetext = "";
+						if (this.console == false){this.console = true;}
+						else {this.console = false;}
+					}
+				else if (!this.console){return;}
+				else if (arg == 8){this.typetext = this.typetext.substring(0, this.typetext.length-1);}
+				else if (arg == 13){
+						if (this.createobj){
+								var insidestring = "";
+								for (ii in objarray[this.creationref.array_pos].coord_array){
+									if (ii != 0){insidestring += ","}
+									insidestring += "{x:" + Math.round(this.creationref.coord_array[ii].x) + ", y:" + Math.round(this.creationref.coord_array[ii].y) + "}";
+								}
+								if (this.objtype == 'b'){this.newobjectsstring += "objarray[objarray.length] = new Poly(new Array(" + insidestring + "), " + newdebug_id + "); \n";}
+								if (this.objtype == 't'){this.newobjectsstring += "objarray[objarray.length] = new ThroughPoly(new Array(" + insidestring + "), " + newdebug_id + "); \n";}
+								this.createobj = false; 
+								this.newobjcounter = 0;
+								
+								if (this.objtype == 'block' || this.objtype == 'tblock' || this.objtype == 'eblock' || this.objtype == 'rblock' || this.objtype == 'bossblock'){
+									this.newobjectsstring += "objarray[objarray.length] = new RectBlock(" + '\'' + this.objtype +'\','  + objarray[this.creationref.array_pos].x + ', ' + 
+											objarray[this.creationref.array_pos].y + ', ' + objarray[this.creationref.array_pos].width + ', ' + 
+											objarray[this.creationref.array_pos].height + ', ' + newdebug_id + "); \n";
+								}
+								if (this.objtype == 'leftledge' || this.objtype == 'rightledge'){
+									this.newobjectsstring += "objarray[objarray.length] = new LedgeBox(" + '\'' + objarray[this.creationref.array_pos].id + '\','  + objarray[this.creationref.array_pos].x + ', ' + 
+											objarray[this.creationref.array_pos].y + ', ' + objarray[this.creationref.array_pos].width + ', ' + 
+											objarray[this.creationref.array_pos].height + ', ' + newdebug_id + "); \n";
+								}
+								if (this.objtype == 'porc'){
+									this.newobjectsstring += "objarray[objarray.length] = new Porc(" + objarray[this.creationref.array_pos].x + ', ' + 
+											objarray[this.creationref.array_pos].y + ', ' + newdebug_id + "); \n";
+								}
+								if (this.objtype == 'iggy'){
+									this.newobjectsstring += "objarray[objarray.length] = new Iggy(" + objarray[this.creationref.array_pos].x + ', ' + 
+											objarray[this.creationref.array_pos].y + ', ' + newdebug_id + "); \n";
+								}
+								if (this.objtype == 'buggo'){
+									this.newobjectsstring += "objarray[objarray.length] = new Buggo(" + objarray[this.creationref.array_pos].x + ', ' + 
+											objarray[this.creationref.array_pos].y + ', ' + newdebug_id + "); \n";
+								}
+								if (this.objtype == 'bug'){
+									this.newobjectsstring += "objarray[objarray.length] = new Item( \'bug\', " + objarray[this.creationref.array_pos].x + ', ' + 
+											objarray[this.creationref.array_pos].y + ', sprite_bugs, ' + objarray[this.creationref.array_pos].image_index + ', ' + newdebug_id + "); \n";
+								}
+							}
+						this.execute(this.typetext); 
+						this.typetext = "";
+					}
+				else if (arg == 190){this.typetext += ".";}
+				else if (arg == 32){this.typetext += " ";}
+				else if (arg == 38){
+					this.listposition--; 
+					if (this.listposition<0){this.listposition = 0;}
+					this.typetext = this.executionlist[this.listposition];
+					} //up arrow
+				else if (arg == 40){
+					this.listposition++; 
+					if (this.listposition>this.executionlist.length-1){this.listposition = this.executionlist.length-1;}
+					this.typetext = this.executionlist[this.listposition];
+					} //down arrow
+				else if (arg == 46){
+						this.typetext = "";
+						if (this.createobj){
+							this.createobj = false;
+							if (this.newobjcounter != 0){objarray.splice( this.creationref.array_pos, 1);}
+							this.newobjcounter = 0;
+						}
+					} //delete key
+				else if (arg == 57 && shiftkey == true){this.typetext += "(";}
+				else if (arg == 48 && shiftkey == true){this.typetext += ")";}
+				else if (arg == 16){shiftkey = true;}
+				else if (arg <= 57 && arg >= 48) {this.typetext += key.toLowerCase();}
+				else if (arg <= 90 && arg >= 65) {this.typetext += key.toLowerCase();}
+			}
+			
+			this.click = function(mx, my){
+			
+				if (!this.console){return;}
+				
+				//Check what is at mouse.x and mouse.y
+				for (mi in objarray){
+					if (objarray[mi].id == "polyblock" || objarray[mi].id == "tpblock"){
+						if (polygonpointcollisoncheck(objarray[mi], mx, my) == true){
+								this.clickobjref = objarray[mi];
+								this.typetext = "id: " + this.clickobjref.id + " uniqueID: " + this.clickobjref.debug_id + " ";
+							}
+						}
+					}
+				
+				
+				var mx_snap = Math.round(mx);
+				var my_snap = Math.round(my);
+				
+				//SNAP TO GRID
+				if (this.grid > 0 && this.snap){
+					mx_snap = mx - (mx % this.grid);
+					my_snap = my - (my % this.grid);
+				}
+				
+				if (this.createobj){
+
+					if (this.newobjcounter == 0){
+						this.newobjcounter += 1;
+						if (this.objtype == 'b'){objarray[objarray.length] = new Poly(new Array({x:mx_snap,y:my_snap}, {x:mx_snap,y:my_snap}), newdebug_id++);}
+						else if (this.objtype == 't'){objarray[objarray.length] = new ThroughPoly(new Array({x:mx_snap,y:my_snap}, {x:mx_snap,y:my_snap}), newdebug_id++);}
+						else if (this.objtype == 'block' || this.objtype == 'tblock' || this.objtype == 'eblock' || this.objtype == 'rblock' || this.objtype == 'bossblock'){objarray[objarray.length] = new RectBlock( this.objtype, mx_snap, my_snap, 5, 5, newdebug_id++);}
+						else if (this.objtype == 'leftledge' || this.objtype == 'rightledge'){objarray[objarray.length] = new LedgeBox( this.objtype, mx, my, newdebug_id++);}
+						else if (this.objtype == 'bug'){objarray[objarray.length] = new Item('bug', mx_snap, my_snap, sprite_bugs, 0);}
+						else if (this.objtype == 'porc'){objarray[objarray.length] = new Porc(mx_snap, my_snap, newdebug_id++);}
+						else if (this.objtype == 'iggy'){objarray[objarray.length] = new Iggy(mx_snap, my_snap, newdebug_id++);}
+						else if (this.objtype == 'buggo'){objarray[objarray.length] = new Buggo(mx_snap, my_snap, newdebug_id++);}
+						this.creationref = objarray[objarray.length - 1];
+					}
+					else {
+						this.newobjcounter += 1;
+						if (this.objtype == 'b' || this.objtype == 't'){
+							this.creationref.coord_array[this.newobjcounter] = this.creationref.coord_array[0];
+							this.creationref.coord_array[this.newobjcounter-1] = {x:mx_snap, y:my_snap};
+							}
+						else if (this.objtype == 'block' || this.objtype == 'tblock' || this.objtype == 'eblock' || this.objtype == 'rblock' || this.objtype == 'bossblock'){
+							this.creationref.width = mx_snap - this.creationref.x;
+							this.creationref.height = my_snap - this.creationref.y;
+							}
+						else if (this.objtype == 'bug'){
+							this.creationref.x = mx_snap;
+							this.creationref.y = my_snap;
+							this.creationref.image_index++;
+							if (this.creationref.image_index > this.creationref.sprite.sprite_length){this.creationref.image_index = 0;}
+							}
+						else {
+							this.creationref.x = mx_snap;
+							this.creationref.y = my_snap;
+						}
+						
+					}
+				}
+			}
+			
+			this.execute = function(arg){
+				if (arg == "r"){window.location.reload();}											//'r' restart
+				if (arg == "create poly"){this.createobj = true; this.objtype = 'b'}				//'create poly' click the screen to create coordinates for a new polygon
+				if (arg == "create tpoly"){this.createobj = true; this.objtype = 't'}				//'create tpoly' click the screen to create coordinates for a new through polygon
+				if (arg == "create leftledge"){this.createobj = true; this.objtype = 'leftledge'}	//'create leftledge' click the screen to create coordinates for a new through polygon
+				if (arg == "create rightledge"){this.createobj = true; this.objtype = 'rightledge'}	//'create rightledge' click the screen to create coordinates for a new through polygon
+				if (arg == "create block"){this.createobj = true; this.objtype = 'block'}	//'create block' click the s
+				if (arg == "create tblock"){this.createobj = true; this.objtype = 'tblock'}	//'create tblock' click the s
+				if (arg == "create eblock"){this.createobj = true; this.objtype = 'eblock'}	//'create tblock' click the s
+				if (arg == "create rblock"){this.createobj = true; this.objtype = 'rblock'}	//'create tblock' click the s
+				if (arg == "create bossblock"){this.createobj = true; this.objtype = 'bossblock'}	//'create tblock' click the s
+				if (arg == "create bug"){this.createobj = true; this.objtype = 'bug'}	//'create bug' click the s
+				if (arg == "create porc"){this.createobj = true; this.objtype = 'porc'}	//'create porc' click the s
+				if (arg == "create iggy"){this.createobj = true; this.objtype = 'iggy'}	//'create iggy' click the s
+				if (arg == "create buggo"){this.createobj = true; this.objtype = 'buggo'}	//'create buggo' click the s
+				
+				if (arg == "delete"){this.newobjectsstring += '^^^^^UNDO!!!!! \n'; objarray.splice(this.creationref.array_pos, 1);}				//'delete' deletes to last created item
+				if (arg == "objarray"){console.log(objarray);}				//'delete' deletes to last created item
+				if (arg == "player"){console.log(player);}				//'delete' deletes to last created item
+				
+				if (arg == "grid off"){this.grid = 0;}									//'grid off' turns grid off
+				else if (arg.includes("grid")){
+					this.grid = arg.replace( /^\D+/g, ''); 
+					this.grid = parseInt(this.grid)
+					}																	//'grid #number' turns grid on with size #number
+					
+				if (arg.includes("scale")){												//'scale #number' changes the scale 
+					var newscale = arg.replace( /^\D+/g, '');
+					ctx.scale(1/scale, 1/scale);
+					ctx.scale(newscale, newscale);
+					scale = newscale;	
+					}																	
+				
+				if (arg == "print object code"){console.log(this.newobjectsstring);}    //'print object code' prints the code for new objects create within the console
+				if (arg == "debug"){													//'debug' toggles debug mode
+						if (debug){debug = false}
+						else {debug = true}
+					}   
+				if (arg == "camera"){													//'camera' toggles camera mode
+						if (camera){camera = false; camX=0; camY=0;}
+						else {camera = true}
+					}
+				if (arg == "snap"){														//'snap' toggles grid snap
+						if (this.snap){this.snap = false}
+						else {this.snap = true}
+					}   
+				
+				if (arg != '' && arg != this.pressentertext && arg != this.blocktext){
+					this.executionlist[this.executionlist.length] = arg;
+					this.listposition = this.executionlist.length;
+					}
+				
+			}
+			
+			return this;
+		}
+		
+		/////////////KEY, MOUSE INPUTS/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+		document.onkeydown = function(event){	//Funtion is called every time key is pressed
+			if (player.hp > 0){	
+				if (event.keyCode === 68){
+						if (player.sprite.index == 'simba_roll' || player.sprite.index == 'simba_roar' || player.sprite.index == 'simba_hurt'){return;}
+						player.goright = true;
+						if (player.dir == -1)
+							{
+								player.speed = 2.5;
+								if (player.vspeed == 0 && player.sprite.index != 'simba_turn'){player.sprite = sprite_simba_turn; player.image_index = 0; player.hspeed = 0; player.sprite_speed = 2;}
+							}
+					}			//d key
+				if (event.keyCode === 65){
+						if (player.sprite.index == 'simba_roll' || player.sprite.index == 'simba_roar' || player.sprite.index == 'simba_hurt'){return;}
+						player.goleft = true;
+						if (player.dir == 1)
+							{
+								player.speed = 2.5;
+								if (player.vspeed == 0  && player.sprite.index != 'simba_turn'){player.sprite = sprite_simba_turn; player.image_index = 0; player.hspeed = 0; player.sprite_speed = 2;}
+							}
+						
+					}   			//a key
+				if (event.keyCode === 87){									//w key
+					if (player.sprite.index == 'simba_roll' || player.sprite.index == 'simba_roar' || player.sprite.index == 'simba_hurt'){return;}
+					if (player.jumping == false){	
+						player.image_index = 0; 
+						player.jumping = true;
+						player.vspeed = -7.3;
+						
+						player.sprite = sprite_simba_highjump;
+						if (player.hspeed > 0 || player.hspeed < 0){player.sprite = sprite_simba_jump; player.vspeed = -6.7;}
+						}
+					}
+
+				if (event.keyCode === 83){
+						if (player.sprite.index == 'simba_roll'){return;}
+						if (player.hang == true && player.sprite.index != 'simba_ledgepull')
+						{
+							player.hang = false;
+							player.image_index = 0;
+							player.sprite = sprite_simba_ledgedrop;
+						}
+							
+						if (player.sprite.index != 'simba_crouch' && player.sprite.index == 'simba_run' && player.hspeed != 0 && player.sprite.index != 'simba_roll'){
+						player.sprite = sprite_simba_roll;
+						player.image_index = 0;
+						}
+						
+						else if (player.sprite.index != 'simba_crouch' && player.vspeed == 0){
+						player.sprite = sprite_simba_crouch;
+						player.image_index = 0;
+						}
+										
+					}   		//s key
+				if (event.keyCode === 69){
+						if ((player.sprite.index == 'simba_stand' || player.sprite.index == 'simba_run') && !player.roar){
+							player.roar = true;
+							if (player.r >= 4){objarray[objarray.length] = new HitBox('roarbox', player.x - 120, player.y -40, 240, 80, 0, 0, 10);}
+							player.r = 0;
+							player.image_index = 0;
+							snd_roar.currentTime = 0;
+							snd_roar.play();
+							player.sprite = sprite_simba_roar;
+							}	
+					}			//e key
+			}	
+			
+			key = event.keyCode;
+			controller.type(key);
+				
+			}
+			
+		document.onkeyup = function(event){	//Funtion is called every time key is released
+			if (event.keyCode === 68){player.goright = false; if (player.sprite.index == 'simba_run'){player.sprite = sprite_simba_stand;}}   		//d key
+			if (event.keyCode === 65){player.goleft = false; if (player.sprite.index == 'simba_run'){player.sprite = sprite_simba_stand;}}  			//a key
+			if (event.keyCode === 87){}   		//w key
+			if (event.keyCode === 83){
+					if (player.sprite.index == 'simba_crouch'){
+					player.image_index = 0;
+					player.sprite = sprite_simba_stand;
+					}
+				}   		//s key
+			if (event.keyCode == 16){shiftkey = false;} //shiftkey
+			}
+		
+		canvas.onclick = function(mouse){	//Funtion is called every time the mouse clicks
+				mouseX = mouse.pageX/scale - 10/scale + camX;
+				mouseY = mouse.pageY/scale - 10/scale + camY;
+				controller.click(mouseX, mouseY);
+  
+			}
+					
+		//UPDATE FUNCTION///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+		function update(){
+			
+			ctx.scale(1/scale, 1/scale);
+			ctx.clearRect(0, 0, canvas.width, canvas.height);	//Clear Canvas... clears area
+			ctx.scale(scale, scale);
+			
+			objarray.sort(function(a, b){return a.depth-b.depth}); //sort objarray by depth
+			particlearray.sort(function(a, b){return a.depth-b.depth}); //sort particlearray by depth
+			
+			//Camera actions
+			if (camera){
+				camX += ((camObj.x * scale - (canvas.width/2)) - camX * scale) * 0.15 / scale;
+				camY += ((camObj.y * scale - (canvas.height/2)) - camY * scale) * 0.15 / scale;
+				if (camX < 54){camX = 54}if (camY > 1060){camY = 1060;}
+				if (camX > 1310){camX = 1310;}
+				ctx.translate(-camX , -camY);
+			}
+			
+			//Draw Background
+			if (player.hp >= 1){
+				ctx.drawImage(backgroundsky, -30 + camX, camY, 380, 240);
+				ctx.drawImage(background, 0, 0);
+				}
+			else {
+				ctx.fillStyle = 'black';
+				ctx.fillRect(0,0,3000, 3000);
+				}
+			
+			//ctx.fillStyle = 'red';
+			//ctx.fillText("Calculations: " + calcs, 30 + camX, 30 + camY);
+			//calcs = 0;
+			//ctx.fillStyle = 'black';
+			
+			if (deleteobjects){objarray = [player];}
+			
+			for (aa in objarray){	//Objects tick/step (collison detect... movement..draw)
+				if (aa > objarray.length){return;}
+				objarray[aa].array_pos = aa;
+				objarray[aa].step();
+				}
+			for (bb in particlearray){		//Particles tick/step (collison detect... movement..draw)
+				particlearray[bb].array_pos = bb;
+				particlearray[bb].step();
+				}
+			
+			//return camera to origin
+			if (camera){ctx.translate(camX , camY);}
+			
+			if (player.hp > 0){hud.step();}
+			
+			controller.step();
+				
+			thisLoop = new Date; //UPDATE FPS
+			fps = 1000 / (thisLoop - lastLoop);
+			lastLoop = thisLoop;
+			}
+		
+		function splashupdate(){
+			
+			timer--;
+			
+			ctx.fillRect(0,0,canvas.width/scale, canvas.height/scale);
+			
+			for (aa in objarray){	//Objects tick/step (collison detect... movement..draw)
+				objarray[aa].array_pos = aa;
+				objarray[aa].step();
+				}
+			
+			if (timer < 0){
+				camera = true;
+				init();
+				snd_pridelands.loop = true;
+				snd_pridelands.play();
+				clearInterval(splashscreeninterval);
+				camX = player.x;
+				camY = player.y;
+				scale = 3;
+				ctx.scale(scale, scale);
+				}
+		}
+		
+		function showFPS(){
+			FPS = Math.floor(fps);
+			}
+
+		//////INIT////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+		function loadrescources(){
+		
+			var simba_die = new Image();
+			var simba_idle = new Image();
+			var simba_run = new Image();
+			var simba_stand = new Image();
+			var simba_highjump = new Image();
+			var simba_jump = new Image();
+			var simba_turn = new Image();
+			var simba_crouch = new Image();
+			var simba_roll = new Image();
+			var simba_ledgegrab = new Image();
+			var simba_ledgepull = new Image();
+			var simba_ledgedrop = new Image();
+			var simba_hurt = new Image();
+			var simba_pounce = new Image();
+			var simba_roar = new Image();
+			var junglecover1 = new Image();
+			var junglecover2 = new Image();
+			var jungletrees = new Image();
+			var bugs = new Image();
+			var lifeplus = new Image();
+			var continueplus = new Image();
+			var porc = new Image();
+			var iggy = new Image();
+			var buggo = new Image();
+			var explo = new Image();
+			var sega = new Image();
+			var hp_img = new Image();
+			
+			background.src = "img/lionkingbackground.png";
+			backgroundsky.src = "img/lionkingbackgroundsky.png";
+			
+			simba_die.src = "img/die_strip23.png";
+			simba_idle.src = "img/simba_butterfly_strip56.png";
+			simba_run.src = "img/simba_run_strip10.png";
+			simba_stand.src = "img/simba_stand_strip8.png";
+			simba_highjump.src = "img/simba_highjump_strip12.png";
+			simba_jump.src = "img/simba_jump_strip14.png";
+			simba_crouch.src = "img/simba_crouch_strip5.png";
+			simba_turn.src = "img/simba_turn_strip5.png";
+			simba_roll.src = "img/simba_roll_strip10.png";
+			simba_ledgegrab.src = "img/simba_ledgegrab_strip19.png";
+			simba_ledgepull.src = "img/simba_ledgepull_strip8.png";
+			simba_ledgedrop.src = "img/simba_ledgedrop_strip3.png";
+			simba_hurt.src = "img/simba_hurt_strip6.png";
+			simba_pounce.src = "img/simba_pounce_strip10.png";
+			simba_roar.src = "img/simba_roar_strip11.png";
+			junglecover1.src = "img/junglecover1.png";
+			junglecover2.src = "img/junglecover2.png";
+			jungletrees.src = "img/jungletrees.png";
+			bugs.src = "img/bugs_strip14.png";
+			lifeplus.src = "img/1upitem_strip4.png";
+			continueplus.src = "img/continueitem_strip4.png";
+			porc.src = "img/porc_strip9.png";
+			iggy.src = "img/iggy_strip19.png";
+			buggo.src = "img/buggo_strip12.png";
+			explo.src = "img/explo_strip10.png";
+			sega.src = "img/sega_strip19.png";
+			hp_img.src = "img/life_meter.png";
+			
+			sprite_simba_die = {image:simba_die, index: 'simba_die', sprite_width: 79, sprite_height: 50, sprite_length: 22, xoffset:-39, yoffset:-25};
+			sprite_simba_idle = {image:simba_idle, index: 'simba_idle', sprite_width: 72, sprite_height: 54, sprite_length: 55, xoffset:-34, yoffset:-37};
+			sprite_simba_stand = {image:simba_stand, index: 'simba_stand', sprite_width: 39, sprite_height: 38, sprite_length: 7, xoffset:-23, yoffset:-20};
+			sprite_simba_run = {image:simba_run, index: 'simba_run', sprite_width: 64, sprite_height: 37, sprite_length: 9, xoffset:-34, yoffset:-16};
+			sprite_simba_highjump = {image:simba_highjump, index: 'simba_highjump', sprite_width: 60, sprite_height: 68, sprite_length: 11, xoffset:-30, yoffset:-50};
+			sprite_simba_jump = {image:simba_jump, index: 'simba_jump', sprite_width: 65, sprite_height: 72, sprite_length: 13, xoffset:-32, yoffset:-36};
+			sprite_simba_crouch = {image:simba_crouch, index: 'simba_crouch', sprite_width: 60, sprite_height: 35, sprite_length: 4, xoffset:-30, yoffset:-17};
+			sprite_simba_turn = {image:simba_turn, index: 'simba_turn', sprite_width: 39, sprite_height: 38, sprite_length: 4, xoffset:-20, yoffset:-19};
+			sprite_simba_roll = {image:simba_roll, index: 'simba_roll', sprite_width: 52, sprite_height: 37, sprite_length: 9, xoffset:-26, yoffset:-18};
+			sprite_simba_ledgegrab = {image:simba_ledgegrab, index: 'simba_ledgegrab', sprite_width: 93, sprite_height: 114, sprite_length: 18, xoffset:-46, yoffset:-47};
+			sprite_simba_ledgepull = {image:simba_ledgepull, index: 'simba_ledgepull', sprite_width: 49, sprite_height: 106, sprite_length: 7, xoffset:-16, yoffset:-44};
+			sprite_simba_ledgedrop = {image:simba_ledgedrop, index: 'simba_ledgedrop', sprite_width: 65, sprite_height: 58, sprite_length: 2, xoffset:-32, yoffset:-40};
+			sprite_simba_hurt = {image:simba_hurt, index: 'simba_hurt', sprite_width: 55, sprite_height: 54, sprite_length: 5, xoffset:-27, yoffset:-27};
+			sprite_simba_pounce = {image:simba_pounce, index: 'simba_pounce', sprite_width: 72, sprite_height: 79, sprite_length: 9, xoffset:-30, yoffset:-54};
+			sprite_simba_roar = {image:simba_roar, index: 'simba_roar', sprite_width: 68, sprite_height: 44, sprite_length: 10, xoffset:-36, yoffset:-24};
+			sprite_junglecover1 = {image:junglecover1, index: 'junglecover1', sprite_width: 49, sprite_height: 106, sprite_length: 7, xoffset:0, yoffset:0};
+			sprite_junglecover2 = {image:junglecover2, index: 'junglecover2', sprite_width: 65, sprite_height: 58, sprite_length: 2, xoffset:0, yoffset:0};
+			sprite_jungletrees = {image:jungletrees, index: 'jungletrees', sprite_width: 65, sprite_height: 58, sprite_length: 2, xoffset:0, yoffset:0};
+			sprite_bugs = {image: bugs, index: 'bugs', sprite_width: 23, sprite_height: 23, sprite_length: 13, xoffset:-11, yoffset:-11};
+			sprite_1goup = {image: lifeplus, index: 'lifeplus', sprite_width: 20, sprite_height: 19, sprite_length: 3, xoffset:-10, yoffset:-8};
+			sprite_continueplus = {image: continueplus, index: 'continueplus', sprite_width: 28, sprite_height: 28, sprite_length: 3, xoffset:-14, yoffset:-14};
+			sprite_porc = {image: porc, index: 'porc', sprite_width: 40, sprite_height: 32, sprite_length: 8, xoffset:-20, yoffset:-16};
+			sprite_iggy = {image: iggy, index: 'iggy', sprite_width: 72, sprite_height: 28, sprite_length: 18, xoffset:-20, yoffset:-14};
+			sprite_buggo = {image: buggo, index: 'buggo', sprite_width: 27, sprite_height: 22, sprite_length: 11, xoffset:-14, yoffset:-11};
+			sprite_explo = {image: explo, index: 'explo', sprite_width: 85, sprite_height: 74, sprite_length: 9, xoffset:-42, yoffset:-36};
+			sprite_sega = {image: sega, index: 'sega', sprite_width: 96, sprite_height: 32, sprite_length: 18, xoffset:-48, yoffset:-16};
+		}
+		
+		function createlevel(){
+			objarray[objarray.length] = new RectBlock('block',54, 1271, 1596, 16, 1);
+			objarray[objarray.length] = new RectBlock('block',437, 1175, 79, 10, 3); 
+			objarray[objarray.length] = new LedgeBox('leftledge',425, 1176, 10, 10, 4); 
+			objarray[objarray.length] = new RectBlock('tblock',571, 1146, 97, 9, 5); 
+			objarray[objarray.length] = new LedgeBox('leftledge',562.3333333333331, 1148.5666666666662, 10, 10, 6); 
+			objarray[objarray.length] = new RectBlock('tblock',1048, 1095, 99, 13, 10); 
+			objarray[objarray.length] = new Poly(new Array({x:946, y:1073},{x:1019, y:1075},{x:1050, y:1096},{x:952, y:1093},{x:946, y:1073}), 11); 
+			objarray[objarray.length] = new RectBlock('block',448, 1058, 278, 19, 12); 
+			objarray[objarray.length] = new RectBlock('block',725, 1063, 34, 14, 13); 
+			objarray[objarray.length] = new RectBlock('block',759, 1069, 69, 12, 14); 
+			objarray[objarray.length] = new RectBlock('block',388, 1028, 61, 37, 15); 
+			objarray[objarray.length] = new RectBlock('tblock',446, 950, 164, 14, 28); 
+			objarray[objarray.length] = new RectBlock('block',607, 922, 73, 41, 29); 
+			objarray[objarray.length] = new RectBlock('block',761, 899, 63, 28, 30); 
+			objarray[objarray.length] = new Poly(new Array({x:944, y:890},{x:1084, y:914},{x:1078, y:930},{x:950, y:904},{x:944, y:890}), 32); 
+			objarray[objarray.length] = new Poly(new Array({x:1084, y:871},{x:1086, y:917},{x:1216, y:874},{x:1218, y:822},{x:1084, y:871}), 34); 
+			objarray[objarray.length] = new RectBlock('block',1220, 791, 89, 39, 35); 
+			objarray[objarray.length] = new RectBlock('block',1306, 655, 34, 264, 36); 
+			objarray[objarray.length] = new RectBlock('tblock',1054, 778, 92, 10, 38); 
+			objarray[objarray.length] = new RectBlock('tblock',1131, 698, 49, 9, 39); 
+			objarray[objarray.length] = new RectBlock('tblock',929, 778, 55, 10, 40); 
+			objarray[objarray.length] = new RectBlock('tblock',766, 742, 96, 12, 41); 
+			objarray[objarray.length] = new RectBlock('block',733, 711, 30, 74, 43);  
+			objarray[objarray.length] = new RectBlock('block',471, 635, 53, 46, 53); 
+			objarray[objarray.length] = new RectBlock('tblock',414, 759, 29, 9, 55); 
+			objarray[objarray.length] = new RectBlock('tblock',361, 825, 35, 8, 56); 
+			objarray[objarray.length] = new RectBlock('tblock',467, 810, 43, 12, 57); 
+			objarray[objarray.length] = new RectBlock('tblock',570, 791, 21, 9, 58); 
+			objarray[objarray.length] = new RectBlock('tblock',684, 778, 51, 11, 59); 
+			objarray[objarray.length] = new RectBlock('tblock',362, 533, 56, 11, 60); 
+			objarray[objarray.length] = new RectBlock('tblock',477, 518, 54, 10, 61); 
+			objarray[objarray.length] = new RectBlock('tblock',652, 600, 79, 13, 62);
+			objarray[objarray.length] = new Poly(new Array({x:1070, y:1233},{x:1069, y:1273},{x:1157, y:1240},{x:1158, y:1199},{x:1070, y:1233}), 63); 
+			objarray[objarray.length] = new Poly(new Array({x:1158, y:1200},{x:1158, y:1180},{x:1231, y:1154},{x:1229, y:1178},{x:1158, y:1200}), 64); 
+			objarray[objarray.length] = new RectBlock('block',1229, 1120, 86, 42, 65); 
+			objarray[objarray.length] = new RectBlock('tblock',779, 569, 70, 12, 72); 
+			objarray[objarray.length] = new RectBlock('block',937, 551, 45, 12, 73); 
+			objarray[objarray.length] = new RectBlock('block',1088, 500, 88, 23, 76); 
+			objarray[objarray.length] = new RectBlock('block',1180, 395, 49, 118, 77); 
+			objarray[objarray.length] = new RectBlock('tblock',943, 428, 75, 13, 78); 
+			objarray[objarray.length] = new RectBlock('tblock',1019, 421, 71, 10, 80); 
+			objarray[objarray.length] = new RectBlock('tblock',1136, 329, 120, 14, 81); 
+			objarray[objarray.length] = new RectBlock('tblock',1110, 236, 66, 11, 84); 
+			objarray[objarray.length] = new RectBlock('tblock',939, 310, 39, 13, 85); 
+			objarray[objarray.length] = new RectBlock('block',602, 490, 58, 13, 86); 
+			objarray[objarray.length] = new Poly(new Array({x:248, y:968},{x:388, y:1000},{x:389, y:1034},{x:251, y:989},{x:248, y:968}), 87); 
+			objarray[objarray.length] = new RectBlock('tblock',959, 225, 56, 10, 94); 
+			objarray[objarray.length] = new RectBlock('tblock',900, 168, 49, 9, 95); 
+			objarray[objarray.length] = new RectBlock('tblock',948, 87, 51, 11, 96); 
+			objarray[objarray.length] = new RectBlock('tblock',787, 153, 51, 8, 98); 
+			objarray[objarray.length] = new RectBlock('tblock',811, 311, 47, 10, 99); 
+			objarray[objarray.length] = new RectBlock('tblock',747, 239, 58, 10, 100); 
+			objarray[objarray.length] = new RectBlock('tblock',603, 258, 49, 10, 101); 
+			objarray[objarray.length] = new Poly(new Array({x:792, y:429},{x:661, y:462},{x:664, y:495},{x:782, y:458},{x:792, y:429}), 105); 
+			objarray[objarray.length] = new ThroughPoly(new Array({x:625, y:347},{x:754, y:382},{x:746, y:397},{x:631, y:368},{x:625, y:347}), 106);
+			objarray[objarray.length] = new ThroughPoly(new Array({x:733, y:714},{x:647, y:709},{x:528, y:667},{x:531, y:690},{x:640, y:724},{x:725, y:728},{x:733, y:714}), 107); 
+			objarray[objarray.length] = new Poly(new Array({x:1259, y:117},{x:1260, y:334},{x:1327, y:370},{x:1336, y:160},{x:1259, y:117}), 108); 
+			objarray[objarray.length] = new ThroughPoly(new Array({x:1142, y:94},{x:1258, y:119},{x:1252, y:133},{x:1146, y:111},{x:1142, y:94}), 109); 
+			objarray[objarray.length] = new RectBlock('tblock',309, 457, 60, 9, 110); 
+			objarray[objarray.length] = new RectBlock('tblock',1291, 487, 34, 13, 111);  
+			objarray[objarray.length] = new RectBlock('block',1242, 626, 188, 26, 114); 
+			objarray[objarray.length] = new RectBlock('block',1431, 382, 43, 200, 115); 
+			objarray[objarray.length] = new RectBlock('block',1439, 1217, 209, 51, 116); 
+			objarray[objarray.length] = new RectBlock('tblock',1461, 1130, 56, 19, 117); 
+			objarray[objarray.length] = new RectBlock('tblock',1586, 1056, 54, 29, 118); 
+			objarray[objarray.length] = new RectBlock('tblock',1435, 997, 126, 28, 119); 
+			objarray[objarray.length] = new RectBlock('tblock',1533, 917, 105, 22, 120); 
+			objarray[objarray.length] = new RectBlock('block',1634, 675, 31, 541, 121); 
+			objarray[objarray.length] = new RectBlock('block',1390, 753, 49, 187, 122); 
+			objarray[objarray.length] = new Poly(new Array({x:1435, y:998},{x:1315, y:1011},{x:1315, y:1133},{x:1431, y:1135},{x:1435, y:998}), 123); 
+			objarray[objarray.length] = new RectBlock('block',1435, 1002, 29, 215, 124); 
+			objarray[objarray.length] = new RectBlock('block',1330, 347, 268, 30, 127); 
+			objarray[objarray.length] = new RectBlock('block',1594, 255, 56, 100, 128); 
+			objarray[objarray.length] = new RectBlock('block',1632, 73, 18, 187, 129);
+			objarray[objarray.length] = new LedgeBox('leftledge',940.666666948044, 1074.6000000421016, 10, 10, 130); 
+			objarray[objarray.length] = new LedgeBox('leftledge',238.00000052110965, 967.6333334080692, 10, 10, 131); 
+			objarray[objarray.length] = new LedgeBox('leftledge',437.66669465886775, 950.3658797098527, 10, 10, 132); 
+			objarray[objarray.length] = new LedgeBox('leftledge',935.3333333277435, 890.9000000000003, 10, 10, 134); 
+			objarray[objarray.length] = new LedgeBox('leftledge',1042.333333414443, 779.8999998226695, 10, 10, 135); 
+			objarray[objarray.length] = new LedgeBox('leftledge',1122.6666667475656, 701.7999998229392, 10, 10, 136); 
+			objarray[objarray.length] = new LedgeBox('leftledge',918.3333334183478, 779.3333330211598, 10, 10, 137); 
+			objarray[objarray.length] = new LedgeBox('leftledge',459.0000140237497, 638.1664343378935, 10, 10, 138); 
+			objarray[objarray.length] = new LedgeBox('leftledge',403, 759, 10, 10, 139); 
+			objarray[objarray.length] = new LedgeBox('leftledge',352.1666666666666, 826.1333333333329, 10, 10, 140); 
+			objarray[objarray.length] = new LedgeBox('leftledge',458.16665301252266, 809.9332382363394, 10, 10, 141); 
+			objarray[objarray.length] = new LedgeBox('leftledge',561.1666525578336, 791.9332382534373, 10, 10, 142); 
+			objarray[objarray.length] = new LedgeBox('leftledge',671, 777, 10, 10, 143); 
+			objarray[objarray.length] = new LedgeBox('leftledge',640.666672796249, 599.7999988999755, 10, 10, 144); 
+			objarray[objarray.length] = new LedgeBox('leftledge',768.6666413880487, 571.8999801274206, 10, 10, 145); 
+			objarray[objarray.length] = new LedgeBox('leftledge',927, 552, 10, 10, 146); 
+			objarray[objarray.length] = new LedgeBox('leftledge',932, 429, 10, 10, 147); 
+			objarray[objarray.length] = new LedgeBox('leftledge',1173, 393, 10, 10, 148); 
+			objarray[objarray.length] = new LedgeBox('leftledge',1125.9999999999995, 330.7000000000002, 10, 10, 149); 
+			objarray[objarray.length] = new LedgeBox('leftledge',1283.9999967720214, 488.69995142247205, 10, 10, 150); 
+			objarray[objarray.length] = new LedgeBox('leftledge',1520.333320086844, 917.5666066556677, 10, 10, 151); 
+			objarray[objarray.length] = new LedgeBox('leftledge',1577.99998675351, 1058.199939985208, 10, 10, 152); 
+			objarray[objarray.length] = new LedgeBox('leftledge',593, 490, 10, 10, 153); 
+			objarray[objarray.length] = new LedgeBox('leftledge',801, 314, 10, 10, 154); 
+			objarray[objarray.length] = new LedgeBox('leftledge',615, 351, 10, 10, 155); 
+			objarray[objarray.length] = new LedgeBox('leftledge',738, 239, 10, 10, 156); 
+			objarray[objarray.length] = new LedgeBox('leftledge',931, 316, 10, 10, 158); 
+			objarray[objarray.length] = new LedgeBox('leftledge',1129, 96, 10, 10, 159); 
+			objarray[objarray.length] = new RectBlock('block',1220, 449, 26, 182, 161); 
+			objarray[objarray.length] = new RectBlock('block',1240, 551, 80, 17, 162);
+			objarray[objarray.length] = new LedgeBox('rightledge',515.3333333333331, 1176, 10, 10, 163); 
+			objarray[objarray.length] = new LedgeBox('rightledge',667.9999999995015, 1146.466666666515, 10, 10, 164); 
+			objarray[objarray.length] = new LedgeBox('rightledge',1147.999999895803, 1096.7333279393586, 10, 10, 165); 
+			objarray[objarray.length] = new LedgeBox('rightledge',825, 1074, 10, 10, 166); 
+			objarray[objarray.length] = new LedgeBox('rightledge',681.6666352502286, 923.9985187825907, 10, 10, 167); 
+			objarray[objarray.length] = new LedgeBox('rightledge',821, 903, 10, 10, 168); 
+			objarray[objarray.length] = new LedgeBox('rightledge',1146.8333335689922, 778.566666457035, 10, 10, 169); 
+			objarray[objarray.length] = new LedgeBox('rightledge',1177, 701, 10, 10, 170); 
+			objarray[objarray.length] = new LedgeBox('rightledge',981.666668706514, 779.8999942262799, 10, 10, 171); 
+			objarray[objarray.length] = new LedgeBox('rightledge',859, 745, 10, 10, 172); 
+			objarray[objarray.length] = new LedgeBox('rightledge',443.0000004414512, 759.4666533782666, 10, 10, 173); 
+			objarray[objarray.length] = new LedgeBox('rightledge',392, 824, 10, 10, 174); 
+			objarray[objarray.length] = new LedgeBox('rightledge',507.33332972729585, 809.999977807982, 10, 10, 175); 
+			objarray[objarray.length] = new LedgeBox('rightledge',588.6666630609793, 790.4666444746231, 10, 10, 176); 
+			objarray[objarray.length] = new LedgeBox('rightledge',1089.8333297276463, 421.53331114128923, 10, 10, 177); 
+			objarray[objarray.length] = new LedgeBox('rightledge',980, 316, 10, 10, 178); 
+			objarray[objarray.length] = new LedgeBox('rightledge',858.0000000000007, 312.5666666666679, 10, 10, 179); 
+			objarray[objarray.length] = new LedgeBox('rightledge',1228.1666066651837, 396.232960596305, 10, 10, 180); 
+			objarray[objarray.length] = new LedgeBox('rightledge',1244, 452, 10, 10, 181); 
+			objarray[objarray.length] = new LedgeBox('rightledge',1560, 999, 10, 10, 184); 
+			objarray[objarray.length] = new LedgeBox('rightledge',1516.166748849517, 1131.7998448743754, 10, 10, 185); 
+			objarray[objarray.length] = new LedgeBox('rightledge',730.4999879245324, 600.3332605250928, 10, 10, 186); 
+			objarray[objarray.length] = new LedgeBox('rightledge',847, 567, 10, 10, 187); 
+			objarray[objarray.length] = new LedgeBox('rightledge',790.5001356389955, 428.2665598530528, 10, 10, 188); 
+			objarray[objarray.length] = new LedgeBox('rightledge',802, 239, 10, 10, 190); 
+			objarray[objarray.length] = new LedgeBox('leftledge',1586, 259, 10, 10, 191);
+			objarray[objarray.length] = new Poly(new Array({x:994, y:502},{x:983, y:510},{x:984, y:556},{x:1090, y:557},{x:1089, y:501},{x:994, y:502}), 192); 
+			objarray[objarray.length] = new RectBlock('eblock',374, 1241, 25, 32, 193); 
+			objarray[objarray.length] = new RectBlock('eblock',1053, 1241, 20, 31, 194); 
+			objarray[objarray.length] = new Porc(945, 1263.5, 195); 
+			objarray[objarray.length] = new Iggy(537, 1267.5, 196); 
+			objarray[objarray.length] = new Iggy(738, 1267.5, 197);
+			objarray[objarray.length] = new Iggy(1097, 1091.5, 198); 
+			objarray[objarray.length] = new RectBlock('eblock',1142, 1069, 22, 25, 199); 
+			objarray[objarray.length] = new RectBlock('eblock',1037, 1072, 17, 26, 200); 
+			objarray[objarray.length] = new RectBlock('eblock',824, 1048, 21, 23, 201); 
+			objarray[objarray.length] = new Iggy(775, 1065.5, 202);  
+			objarray[objarray.length] = new Porc(527, 1050.5, 204); 
+			objarray[objarray.length] = new Iggy(311, 973, 205); 
+			objarray[objarray.length] = new RectBlock('eblock',357, 967, 31, 32, 206); 
+			objarray[objarray.length] = new RectBlock('eblock',243, 946, 30, 29, 207); 
+			objarray[objarray.length] = new RectBlock('eblock',587, 899, 23, 27, 208); 
+			objarray[objarray.length] = new RectBlock('eblock',677, 897, 24, 30, 209); 
+			objarray[objarray.length] = new Iggy(637, 918.5, 210); 
+			objarray[objarray.length] = new RectBlock('eblock',749, 875, 16, 30, 211); 
+			objarray[objarray.length] = new RectBlock('eblock',821, 870, 19, 31, 212); 
+			objarray[objarray.length] = new Buggo(791, 891.5, 213); 
+			objarray[objarray.length] = new RectBlock('eblock',1197, 767, 22, 24, 214); 
+			objarray[objarray.length] = new Iggy(1261, 787.5, 215); 
+			objarray[objarray.length] = new RectBlock('eblock',981, 751, 21, 25, 216); 
+			objarray[objarray.length] = new RectBlock('eblock',915, 750, 16, 25, 217); 
+			objarray[objarray.length] = new Buggo(957, 767, 218); 
+			objarray[objarray.length] = new Porc(495, 627.5, 222); 
+			objarray[objarray.length] = new RectBlock('eblock',521, 604, 19, 64, 223); 
+			objarray[objarray.length] = new RectBlock('eblock',457, 603, 14, 38, 224); 
+			objarray[objarray.length] = new RectBlock('eblock',846, 542, 23, 29, 225); 
+			objarray[objarray.length] = new RectBlock('eblock',757, 534, 22, 38, 226); 
+			objarray[objarray.length] = new Buggo(815, 561, 227); 
+			objarray[objarray.length] = new RectBlock('eblock',969, 469, 24, 34, 228); 
+			objarray[objarray.length] = new Iggy(1085, 494, 229); 
+			objarray[objarray.length] = new Iggy(1123, 496.5, 230); 
+			objarray[objarray.length] = new RectBlock('eblock',1422, 584, 15, 42, 231); 
+			objarray[objarray.length] = new RectBlock('eblock',1318, 570, 17, 50, 232); 
+			objarray[objarray.length] = new Porc(1379, 618.5, 233); 
+			objarray[objarray.length] = new RectBlock('eblock',1117, 296, 21, 34, 234); 
+			objarray[objarray.length] = new Iggy(1189, 325.5, 235); 
+			objarray[objarray.length] = new LedgeBox('leftledge',753.9999999999998, 901.7999999999984, 10, 10, 236); 
+			objarray[objarray.length] = new LedgeBox('rightledge',1327.0000000000007, 489.46666666666687, 10, 10, 238);
+			objarray[objarray.length] = new RectBlock('eblock',1252, 290, 23, 40, 239);
+			objarray[objarray.length] = new RectBlock('eblock',720, 335, 35, 44, 240); 
+			objarray[objarray.length] = new RectBlock('eblock',612, 313, 28, 36, 241); 
+			objarray[objarray.length] = new Iggy(700, 357, 242); 
+			objarray[objarray.length] = new Iggy(738, 438, 243); 
+			objarray[objarray.length] = new RectBlock('eblock',787, 399, 28, 34, 244); 
+			objarray[objarray.length] = new RectBlock('eblock',652, 424, 30, 35, 245); 
+			objarray[objarray.length] = new RectBlock('eblock',1556, 958, 20, 41, 239); 
+			objarray[objarray.length] = new RectBlock('eblock',1434, 958, 18, 43, 240); 
+			objarray[objarray.length] = new Porc(1505, 989.5, 241); 
+			objarray[objarray.length] = new RectBlock('eblock',636, 1026, 26, 30, 242); 
+			objarray[objarray.length] = new RectBlock('eblock',1303, 761, 15, 25, 243);
+			objarray[objarray.length] = new RectBlock('eblock',759, 647, 22, 67, 245); 
+			objarray[objarray.length] = new Iggy(712, 705, 246); 
+			objarray[objarray.length] = new RectBlock('eblock',637, 665, 26, 47, 247); 
+			objarray[objarray.length] = new Iggy(559, 664.5, 248); 
+			objarray[objarray.length] = new LedgeBox('rightledge',1326, 552, 10, 10, 249);
+			objarray[objarray.length] = new RectBlock('tblock',642, 708, 96, 24, 251); 
+			objarray[objarray.length] = new RectBlock('eblock',437, 1031, 28, 29, 252);
+			objarray[objarray.length] = new JungleCover();
+			objarray[objarray.length] = new RectBlock('rblock',1433, 588, 181, 148, 252); 
+			objarray[objarray.length] = new RectBlock('rblock',1308, 950, 130, 47, 253); 
+			objarray[objarray.length] = new Item( 'bug', 466, 1135, sprite_bugs, 0, 254); 
+			objarray[objarray.length] = new Item( 'bug', 1151, 653, sprite_bugs, 1, 254); 
+			objarray[objarray.length] = new Item( 'bug', 705, 754, sprite_bugs, 2, 254); 
+			objarray[objarray.length] = new Item( 'bug', 381, 495, sprite_bugs, 0, 254); 
+			objarray[objarray.length] = new Item( 'bug', 336, 412, sprite_bugs, 12, 254); 
+			objarray[objarray.length] = new Item( 'bug', 620, 222, sprite_bugs, 7, 254); 
+			objarray[objarray.length] = new Item( 'bug', 810, 114, sprite_bugs, 1, 254); 
+			objarray[objarray.length] = new Item( 'bug', 1140, 193, sprite_bugs, 0, 254); 
+			objarray[objarray.length] = new Item( 'bug', 1320, 95, sprite_bugs, 1, 254); 
+			objarray[objarray.length] = new Item( 'bug', 1494, 1098, sprite_bugs, 0, 254);
+			objarray[objarray.length] = new RectBlock('bossblock',1334, 286, 254, 56, 255); 
+			newdebug_id = 254;
+		}
+		
+		function init(){
+		
+			controller = new Console();
+			player = new Player(100,1200);
+			hud = new Hud();
+			camObj = player;
+			objarray = [player, new Fade()];			
+			setInterval(update,18);
+			setInterval(showFPS,300);
+			
+			createlevel();
+			
+		}
+		
+		var background = new Image();
+		var backgroundsky = new Image();
+		loadrescources();
+		
+		//FPS Counter
+		var thisLoop = new Date;
+		var fps = 1000 / (thisLoop - lastLoop);
+		var lastLoop = thisLoop;
+		var FPS = fps;
+		
+		var deleteobjects = false;
+		
+		var camera = false;
+		var camObj = "";
+		var camX = 0;
+		var camY = 0;
+		
+		var debugid = 0;
+		var objarray = [new SegaLogo()];
+		var particlearray = [];
+		var debug = false;
+		var key = 0;
+		var shiftkey = false;
+		var scale = 1;
+		ctx.scale(scale, scale);
+		
+		timer = 200;
+		
+		var snd_cool = document.createElement("audio");
+		snd_cool.src = "wav/cool.wav";
+		var snd_dakingreturns = document.createElement("audio");
+		snd_dakingreturns.src = "wav/dakingreturns.wav";
+		var snd_explo = document.createElement("audio");
+		snd_explo.src = "wav/explo.wav";
+		var snd_grab = document.createElement("audio");
+		snd_grab.src = "wav/grab.wav";
+		var snd_grrr = document.createElement("audio");
+		snd_grrr.src = "wav/grrr.wav";
+		var snd_hit_a = document.createElement("audio");
+		snd_hit_a.src = "wav/hit_a.wav";
+		var snd_hit_b = document.createElement("audio");
+		snd_hit_b.src = "wav/hit_b.wav";
+		var snd_huffpuff = document.createElement("audio");
+		snd_huffpuff.src = "wav/huffpuff.wav";
+		var snd_hurt = document.createElement("audio");
+		snd_hurt.src = "wav/hurt.wav";
+		var snd_iggy = document.createElement("audio");
+		snd_iggy.src = "wav/iggy.wav";
+		var snd_roar = document.createElement("audio");
+		snd_roar.src = "wav/roar.wav";
+		var snd_savepoint = document.createElement("audio");
+		snd_savepoint.src = "wav/savepoint.wav";
+		var snd_twinkle_a = document.createElement("audio");
+		snd_twinkle_a.src = "wav/twinkle_a.wav";
+		var snd_twinkle_b = document.createElement("audio");
+		snd_twinkle_b.src = "wav/twinkle_b.wav";
+		var snd_twinkle_c = document.createElement("audio");
+		snd_twinkle_c.src = "wav/twinkle_c.wav";
+		var snd_death = document.createElement("audio");
+		snd_death.src = "wav/death_music.wav";
+		var snd_pridelands = document.createElement("audio");
+		snd_pridelands.src = "wav/pridelands.wav";
+		var snd_bugmusic = document.createElement("audio");
+		snd_bugmusic.src = "wav/bug_music.wav";
+
+		
+		var calcs = 0;
+		var splashscreeninterval = setInterval(splashupdate, 20);
+</script>
+
+</html>
